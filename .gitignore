@@ -1,0 +1,3 @@
+kube.config
+kcp.kubeconfig
+tmp/**
