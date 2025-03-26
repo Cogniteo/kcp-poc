@@ -197,10 +197,10 @@ install-krew:
 # install-argocd: Install Argo CD on the $(PLATFORM_CLUSTER) cluster.
 # ------------------------------------------------------------------------------
 install-argocd:
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context kind-$(PLATFORM_CLUSTER)
 	@echo "Installing Argo CD on the $(PLATFORM_CLUSTER) cluster..."
 	@helm repo add argo https://argoproj.github.io/argo-helm || true
 	@helm repo update
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context kind-$(PLATFORM_CLUSTER)
 	@helm upgrade --install argocd argo/argo-cd \
 	  --namespace argocd \
 	  --create-namespace \
@@ -212,15 +212,16 @@ install-argocd:
 # create a secret with the platform cluster's kubeconfig.
 # ------------------------------------------------------------------------------
 install-api-syncagent:
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context kind-$(PLATFORM_CLUSTER)
 	@echo "Installing 'api-syncagent' chart on the $(PROVIDERS_CLUSTER) cluster..."
 	@helm repo add kcp-dev https://kcp-dev.github.io/helm-charts || true
 	@helm repo update
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context kind-$(PROVIDERS_CLUSTER)
 	@helm upgrade --install api-syncagent kcp-dev/api-syncagent \
 	  --namespace api-syncagent \
 	  --create-namespace \
 	  --kube-context kind-$(PROVIDERS_CLUSTER) \
-	  --kubeconfig "$(KUBECONFIG_FILE)"
+	  --kubeconfig "$(KUBECONFIG_FILE)" \
+	  -f values-syncagent.yaml
 	@echo "Creating secret 'platform-kubeconfig' in the 'api-syncagent' namespace on the $(PROVIDERS_CLUSTER) cluster..."
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context kind-$(PROVIDERS_CLUSTER)
 	@kubectl create secret generic platform-kubeconfig \
