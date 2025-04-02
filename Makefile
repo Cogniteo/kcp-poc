@@ -8,6 +8,9 @@ TENANT2_CLUSTER    ?= tenant2
 HOSTNAME           ?= kcp.local.gd
 # Location of your merged kubeconfig file
 KUBECONFIG_FILE    ?= kube.config
+KUBECONFIG_FILE    ?= kcp.kubeconfig
+KREW_ROOT          ?= $(HOME)/.krew
+
 
 .PHONY: all clusters kcp-cluster providers-cluster tenant-clusters \
         install-cert-manager install-kcp install-kcp-plugin install-krew \
@@ -104,26 +107,24 @@ create-kcp-kubeconfig:
 	@echo "Creating tmp directory if necessary..."
 	@mkdir -p tmp
 	@echo "Applying client certificate manifest to the platform cluster..."
-	@kubectl -n kcp --kubeconfig="$(KUBECONFIG_FILE)" apply -f manifests/platform/cert.yaml
-	@kubectl -n kcp wait certificate --for=condition=ready -l app.kubernetes.io/instance=kcp
-	@echo "Setting KCP_EXTERNAL_HOSTNAME to kcp.local.gd..."
-	@export KCP_EXTERNAL_HOSTNAME=kcp.local.gd; \
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp apply -f manifests/platform/cert.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp wait certificate --for=condition=ready -l app.kubernetes.io/instance=kcp
 	echo "Extracting the KCP front proxy certificate to tmp/ca.crt..."
-	@kubectl -n kcp get secret kcp-front-proxy-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/ca.crt
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp get secret kcp-front-proxy-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/ca.crt
+	@echo "Extracting client certificate and key from secret..."
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/client.crt
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.key}' | base64 -d > tmp/client.key
+	@chmod 600 tmp/client.crt tmp/client.key
+
 	echo "Configuring 'base' cluster in kcp.kubeconfig..."
 	@kubectl --kubeconfig=kcp.kubeconfig config set-cluster base --server https://$(HOSTNAME):30443 --certificate-authority=tmp/ca.crt
 	echo "Configuring 'root' cluster in kcp.kubeconfig..."
 	@kubectl --kubeconfig=kcp.kubeconfig config set-cluster root --server https://$(HOSTNAME):30443/clusters/root --certificate-authority=tmp/ca.crt
-	@echo "Extracting client certificate and key from secret..."
-	@kubectl -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/client.crt
-	@kubectl -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.key}' | base64 -d > tmp/client.key
-	@chmod 600 tmp/client.crt tmp/client.key
-
 	@echo "Setting kcp-admin credentials in kcp.kubeconfig..."
-	@kubectl --kubeconfig=kcp.kubeconfig config set-credentials kcp-admin --client-certificate=tmp/client.crt --client-key=tmp/client.key
-	@kubectl --kubeconfig=kcp.kubeconfig config set-context base --cluster=base --user=kcp-admin
-	@kubectl --kubeconfig=kcp.kubeconfig config set-context root --cluster=root --user=kcp-admin
-	@kubectl --kubeconfig=kcp.kubeconfig config use-context root
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-credentials kcp-admin --client-certificate=tmp/client.crt --client-key=tmp/client.key
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context base --cluster=base --user=kcp-admin
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context root --cluster=root --user=kcp-admin
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config use-context root
 # ------------------------------------------------------------------------------
 # install-cert-manager: Install cert-manager on the $(PLATFORM_CLUSTER) cluster using Helm.
 # ------------------------------------------------------------------------------
@@ -180,6 +181,7 @@ install-kcp-plugin:
 	@kubectl krew install kcp-dev/kcp
 	@kubectl krew install kcp-dev/ws
 	@kubectl krew install kcp-dev/create-workspace
+	@cp ${KREW_ROOT}/bin/kubectl-create_workspace ${KREW_ROOT}/bin/kubectl-create-workspace
 
 # ------------------------------------------------------------------------------
 # install-krew: Install Krew via Homebrew if not already installed.
