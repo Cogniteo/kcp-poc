@@ -9,33 +9,47 @@ This demo uses four Kubernetes clusters:
 - **Tenant Clusters** (tenant1 and tenant2): Simulates multi-tenant environments
 
 ## Prerequisites
-- [kind](https://kind.sigs.k8s.io/) - For creating local Kubernetes clusters
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) - For interacting with Kubernetes clusters
-- [krew](https://krew.sigs.k8s.io/) - Kubernetes plugin manager
+- [AWS CLI](https://docs.aws.amazon.com/cli) configured with credentials and region.
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [helm](https://helm.sh/)
+- [krew](https://krew.sigs.k8s.io/)
 
 ## Installation & Setup
-The repository includes a comprehensive Makefile to automate the setup process:
-``` shell
-# Set up all components (clusters, CLI tools, KCP, and tenant resources)
-make all
+The repository includes a Makefile to automate setup:
 
-# Create only the Kubernetes clusters
-make clusters
+```shell
+# Bring up all infrastructure and apps (VPC, EKS, Argo CD, External DNS, KCP)
+# DOMAIN=<your-domain> make up (e.g., DOMAIN=example.com)
+DOMAIN=example.com make up
 
-# Clean up resources
+# Tear down infrastructure (EKS, VPC)
+make down
+
+# Clean local artifacts and Argo CD Applications
 make clean
 ```
-### Cluster Setup
-Individual clusters can be provisioned separately with:
-``` shell
-# Create the platform cluster for KCP
-make kcp
 
-# Create the providers cluster
-make providers 
+## Stack Components
+Provision or tear down components individually:
 
-# Create the tenant clusters
-make tenant
+```shell
+# Create VPC
+make vpc-create
+
+# Create EKS cluster
+make eks-create
+
+# Install/upgrade Argo CD
+make argocd-install
+
+# Deploy applications (External DNS, Cert Manager, ACK, KCP)
+make kcp-install
+
+# Install kubectl plugins for KCP
+make kcp-setup-kubectl
+
+# Generate KCP kubeconfig
+make kcp-create-kubeconfig
 ```
 
 ## Components
@@ -43,8 +57,9 @@ The setup includes several key components:
 1. **KCP**: The central control plane (installed as part of the setup)
 2. **Cert Manager**: For certificate management
 3. **ArgoCD**: For GitOps-style deployments
-4. **NGINX Controller**: For ingress management
-5. **API SyncAgent**: For synchronizing resources between clusters
+4. **External DNS**: For domain name management
+5. **ACK**: For AWS service integration
+6. **API SyncAgent**: For synchronizing resources between clusters
 
 ## Sample KCP Commands
 Once you have KCP up and running, here are some useful commands to interact with it:
@@ -83,6 +98,3 @@ kubectl --kubeconfig=kcp.kubeconfig apply -f manifests/platform/workspace-types/
 
 # Create a workspace of "dev" type from a file
 kubectl --kubeconfig=kcp.kubeconfig apply -f manifests/platform/workspaces/tenant1.yaml
-```
-
-

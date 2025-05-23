@@ -4,4 +4,4 @@ metadata:
   name: argocd-elb-cert
   namespace: ack-system
 spec:
-  domainName: argocd.kcp.piotrjanik.dev
+  domainName: "argocd.${DOMAIN}"

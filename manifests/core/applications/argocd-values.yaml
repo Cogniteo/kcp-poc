@@ -1,10 +1,7 @@
 # Helm values for Argo CD installation (mirrors Makefile --set flags)
-global:
-  domain: "argocd.kcp.piotrjanik.dev"
 configs:
   params:
     server.insecure: true
-
 server:
   ingress:
     enabled: true
@@ -19,11 +16,7 @@ server:
     aws:
       serviceType: ClusterIP
       backendProtocolVersion: GRPC
-    tls:
-      - hosts:
-          - "argocd.kcp.piotrjanik.dev"
 dex:
   enabled: false
-
 notifications:
   enabled: false

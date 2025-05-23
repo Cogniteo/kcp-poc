@@ -12,7 +12,7 @@ spec:
     helm:
       releaseName: kcp
       valuesObject:
-        externalHostname: "api.kcp.piotrjanik.dev"
+        externalHostname: "api.${DOMAIN}"
         kcpFrontProxy:
           v: 9
           service:
@@ -20,24 +20,15 @@ spec:
             annotations:
               service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
               service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-              external-dns.alpha.kubernetes.io/hostname: "api.kcp.piotrjanik.dev"
+              external-dns.alpha.kubernetes.io/hostname: "api.${DOMAIN}"
         etcd:
           resources:
             requests:
               memory: 256Mi
-        # certificates:
-        #   dnsNames:
-        #     - api.kcp.piotrjanik.dev
+
         kcp:
-          # tag is set via --set flag to make it more dynamic for testing purposes
           v: 9
           volumeClassName: "standard"
-          hostAliases:
-            enabled: true
-            values:
-              - ip: "10.96.0.100"
-                hostnames:
-                  - "api.kcp.piotrjanik.dev"
         audit:
           enabled: false
   destination:

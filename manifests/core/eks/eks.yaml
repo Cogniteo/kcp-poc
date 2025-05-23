@@ -105,7 +105,6 @@ Resources:
       Description:
         Allow managed and unmanaged nodes to communicate with each other
         (all ports)
-      FromPort: 0
       GroupId:
         Ref: ClusterSharedNodeSecurityGroup
       IpProtocol: "-1"
@@ -113,23 +112,19 @@ Resources:
         Fn::GetAtt:
           - ControlPlane
           - ClusterSecurityGroupId
-      ToPort: 65535
   IngressInterNodeGroupSG:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       Description: Allow nodes to communicate with each other (all ports)
-      FromPort: 0
       GroupId:
         Ref: ClusterSharedNodeSecurityGroup
       IpProtocol: "-1"
       SourceSecurityGroupId:
         Ref: ClusterSharedNodeSecurityGroup
-      ToPort: 65535
   IngressNodeToDefaultClusterSG:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       Description: Allow unmanaged nodes to communicate with control plane (all ports)
-      FromPort: 0
       GroupId:
         Fn::GetAtt:
           - ControlPlane
@@ -137,7 +132,6 @@ Resources:
       IpProtocol: "-1"
       SourceSecurityGroupId:
         Ref: ClusterSharedNodeSecurityGroup
-      ToPort: 65535
   ServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -241,17 +235,6 @@ Resources:
     DependsOn:
       - ControlPlane
 
-  ExternalDNSAddon:
-    Type: AWS::EKS::Addon
-    Properties:
-      ClusterName: !Ref ClusterName
-      AddonName: external-dns
-      ServiceAccountRoleArn: !GetAtt ExternalDnsRole.Arn
-      ResolveConflicts: OVERWRITE
-    DependsOn:
-      - ControlPlane
-      - ExternalDnsPodIdentityAssociation
-
   # IAM IRSA role and association for AWS Controllers for Kubernetes (ACK operator)
   AckControllerRole:
     Type: AWS::IAM::Role
@@ -299,3 +282,20 @@ Resources:
       RoleArn: !GetAtt AckControllerRole.Arn
     DependsOn:
       - ControlPlane
+
+Outputs:
+  ExternalDNSRoleArn:
+    Description: "ARN of the IAM role for ExternalDNS"
+    Value: !GetAtt ExternalDnsRole.Arn
+    Export:
+      Name: !Sub "${ClusterName}-externaldns-role-arn"
+  CertManagerRoleArn:
+    Description: "ARN of the IAM role for Cert Manager"
+    Value: !GetAtt CertManagerRole.Arn
+    Export:
+      Name: !Sub "${ClusterName}-certmanager-role-arn"
+  AckControllerRoleArn:
+    Description: "ARN of the IAM role for ACK Controller"
+    Value: !GetAtt AckControllerRole.Arn
+    Export:
+      Name: !Sub "${ClusterName}-ackcontroller-role-arn"
