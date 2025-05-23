@@ -1,0 +1,7 @@
+kind: Workspace
+apiVersion: tenancy.kcp.io/v1alpha1
+metadata:
+  name: databases
+spec:
+  type:
+    name: provider

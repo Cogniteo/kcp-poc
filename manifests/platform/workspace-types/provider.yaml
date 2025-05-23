@@ -1,0 +1,4 @@
+kind: WorkspaceType
+apiVersion: tenancy.kcp.io/v1alpha1
+metadata:
+  name: dev

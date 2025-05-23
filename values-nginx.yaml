@@ -1,6 +1,0 @@
-controller:
-  service:
-    type: NodePort
-    nodePorts:
-      http: 40080
-      https: 40443
