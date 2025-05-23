@@ -66,35 +66,23 @@ Once you have KCP up and running, here are some useful commands to interact with
 
 ```shell
 # Create a workspace
-kubectl kcp workspace create my-workspace --kubeconfig=kcp.kubeconfig
+export KUBECONFIG=kcp.kubeconfig
+kubectl create workspace my-workspace
 
 # Use a workspace
-kubectl kcp workspace use my-workspace --kubeconfig=kcp.kubeconfig
+kubectl ws my-workspace
 
 # List workspaces
-kubectl kcp workspace list --kubeconfig=kcp.kubeconfig
+kubectl get workspace
 
-# Create a logical cluster within a workspace
-kubectl kcp workspace create my-cluster --type=LogicalCluster --kubeconfig=kcp.kubeconfig
-
-# Bind a service account to a workspace
-kubectl create serviceaccount my-sa --kubeconfig=kcp.kubeconfig
-kubectl kcp bind my-sa --workspace my-workspace --role admin --kubeconfig=kcp.kubeconfig
-
-# Sync resources between KCP and a physical cluster
-kubectl kcp workload sync my-workspace --syncer-image kcp-syncer:latest --kubeconfig=kcp.kubeconfig
+# Tree of workspaces
+kubectl ws tree
 
 # View API resources available in the workspace
-kubectl api-resources --kubeconfig=kcp.kubeconfig
-
-# Export a kubeconfig for a workspace
-kubectl kcp workspace get-kubeconfig my-workspace --kubeconfig=kcp.kubeconfig > my-workspace-kubeconfig.yaml
-
-# Switch between different workspaces
-kubectl kcp workspace use another-workspace --kubeconfig=kcp.kubeconfig
+kubectl api-resources
 
 # Create a workspace type from a file
-kubectl --kubeconfig=kcp.kubeconfig apply -f manifests/platform/workspace-types/dev.yaml
+kubectl apply -f manifests/platform/workspace-types/dev.yaml
 
 # Create a workspace of "dev" type from a file
-kubectl --kubeconfig=kcp.kubeconfig apply -f manifests/platform/workspaces/tenant1.yaml
+kubectl apply -f manifests/platform/workspaces/tenant1.yaml
