@@ -1,0 +1,11 @@
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIExport
+metadata:
+  name: apis.contrib.kcp.io
+spec:
+  latestResourceSchemas:
+    - v250312-8223e7b.applications.apis.contrib.kcp.io
+  permissionClaims:
+    - all: true
+      resource: secrets
+status: {}

@@ -1,37 +1,33 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kcp-application
+  name: kcp
   namespace: argocd
 spec:
   project: default
   source:
     repoURL: https://kcp-dev.github.io/helm-charts
     chart: kcp
-    targetRevision: HEAD
-
+    targetRevision: 0.10.0
     helm:
       releaseName: kcp
       valuesObject:
-        externalHostname: "kcp.local.gd"
+        externalHostname: "api.kcp.piotrjanik.dev"
         kcpFrontProxy:
           v: 9
           service:
-            type: NodePort
-            nodePort: 30443
-            clusterIP: "10.96.0.100"
-          certificateIssuer:
-            name: selfsigned-cluster-issuer
-            kind: ClusterIssuer
-        externalPort: "30443"
+            type: LoadBalancer
+            annotations:
+              service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+              service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+              external-dns.alpha.kubernetes.io/hostname: "api.kcp.piotrjanik.dev"
         etcd:
           resources:
             requests:
               memory: 256Mi
-        certificates:
-          dnsNames:
-            - localhost
-            - kcp.local.gd
+        # certificates:
+        #   dnsNames:
+        #     - api.kcp.piotrjanik.dev
         kcp:
           # tag is set via --set flag to make it more dynamic for testing purposes
           v: 9
@@ -41,13 +37,15 @@ spec:
             values:
               - ip: "10.96.0.100"
                 hostnames:
-                  - "kcp.local.gd"
+                  - "api.kcp.piotrjanik.dev"
         audit:
-          enabled: true
+          enabled: false
   destination:
-    server: '<KCP_CLUSTER_API_SERVER>' # for example, extracted from the kubeconfig of the kcp cluster
-    namespace: <TARGET_NAMESPACE>
+    server: "https://kubernetes.default.svc"
+    namespace: kcp
   syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
     automated:
       prune: true
       selfHeal: true

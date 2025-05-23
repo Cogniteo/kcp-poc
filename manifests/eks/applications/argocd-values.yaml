@@ -1,0 +1,29 @@
+# Helm values for Argo CD installation (mirrors Makefile --set flags)
+global:
+  domain: "argocd.kcp.piotrjanik.dev"
+configs:
+  params:
+    server.insecure: true
+
+server:
+  ingress:
+    enabled: true
+    controller: aws
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/backend-protocol: HTTP
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+    aws:
+      serviceType: ClusterIP
+      backendProtocolVersion: GRPC
+    tls:
+      - hosts:
+          - "argocd.kcp.piotrjanik.dev"
+dex:
+  enabled: false
+
+notifications:
+  enabled: false

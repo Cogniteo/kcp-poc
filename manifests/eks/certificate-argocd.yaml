@@ -1,0 +1,7 @@
+apiVersion: acm.services.k8s.aws/v1alpha1
+kind: Certificate
+metadata:
+  name: argocd-elb-cert
+  namespace: ack-system
+spec:
+  domainName: argocd.kcp.piotrjanik.dev

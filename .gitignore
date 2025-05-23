@@ -1,3 +1,5 @@
 kube.config
 kcp.kubeconfig
 tmp/**
+.vscode/**
+.idea/**

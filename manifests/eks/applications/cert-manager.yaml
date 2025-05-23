@@ -6,20 +6,18 @@ metadata:
 spec:
   project: default
   source:
-    # The official cert-manager Helm repository
     repoURL: "https://charts.jetstack.io"
-    # The name of the cert-manager chart
     chart: cert-manager
-    # Specify the chart version; update this to the desired version
-    targetRevision: "v1.11.0"
+    targetRevision: "1.17.1"
     helm:
-      # Place any custom Helm values here
-      values: |
+      valuesObject:
         installCRDs: true
   destination:
     server: "https://kubernetes.default.svc"
     namespace: cert-manager
   syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
     automated:
       prune: true
       selfHeal: true
