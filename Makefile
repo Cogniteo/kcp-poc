@@ -161,7 +161,6 @@ up:
 	@$(MAKE) kcp-install
 	@$(MAKE) kcp-setup-kubectl
 	@$(MAKE) kcp-create-kubeconfig
-	@$(MAKE) kcp-create-kubeconfig
 
 down:
 	@echo -e "\033[1;31m[DOWN] Deleting EKS cluster\033[0m"
