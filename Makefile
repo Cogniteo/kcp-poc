@@ -46,6 +46,7 @@ vpc-delete:
 
 eks-create:		
 	@echo -e "\033[1;32m[EKS] Creating/updating cluster via CloudFormation\033[0m"
+	@aws iam create-service-linked-role --aws-service-name spot.amazonaws.com > /dev/null 2>&1 || true
 	@aws cloudformation deploy \
 	    --template-file manifests/core/eks/eks.yaml \
 	    --stack-name $(EKS_CLUSTER_NAME) \
