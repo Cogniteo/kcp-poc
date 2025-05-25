@@ -94,8 +94,8 @@ kcp-install:
 	@DOMAIN=$(DOMAIN) envsubst < manifests/core/applications/kcp.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f -
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application kcp
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io certificates.cert-manager.io
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" wait --for=create --timeout=120s -n cert-manager deployment cert-manager-app-webhook
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-app-webhook
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f manifests/core/certificates/clusterissuer.yaml
 	@DOMAIN=$(DOMAIN) envsubst < manifests/core/certificates/certificate-argocd.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f -
 
