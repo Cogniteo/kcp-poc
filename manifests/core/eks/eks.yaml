@@ -299,7 +299,39 @@ Resources:
       RoleArn: !GetAtt AckControllerRole.Arn
     DependsOn:
       - ControlPlane
-
+  AckCognitoControllerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ClusterName}-ack-cognito-controller-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - pods.eks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+      Policies:
+        - PolicyName: ack-cognito-controller-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:*
+                Resource: "*"
+  AckCognitoControllerPodIdentityAssociation:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      Namespace: ack-system
+      ServiceAccount: ack-cognitoidentityprovider-controller
+      RoleArn: !GetAtt AckCognitoControllerRole.Arn
+    DependsOn:
+      - ControlPlane
+  
   BackstageRole:
     Type: AWS::IAM::Role
     Properties:

@@ -1,0 +1,23 @@
+apiVersion: cognitoidentityprovider.services.k8s.aws/v1alpha1
+kind: UserPool
+metadata:
+  name: kcp-userpool
+spec:
+  name: kcp-user-pool
+  autoVerifiedAttributes:
+    - email
+  usernameAttributes:
+    - email
+  policies:
+    passwordPolicy:
+      minimumLength: 8
+      requireLowercase: true
+      requireNumbers: true
+      requireUppercase: true
+  userPoolAddOns:
+    advancedSecurityMode: "OFF"
+  schema:
+    - name: email
+      required: true
+      mutable: true
+      attributeDataType: String

@@ -13,6 +13,10 @@ spec:
       releaseName: ack
       valuesObject:
         installCRDs: true
+        cognitoidentityprovider:
+          enabled: true
+          aws:
+            region: eu-central-1
         acm:
           enabled: true
           aws:
