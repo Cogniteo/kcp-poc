@@ -12,7 +12,7 @@ AWS_REGION         ?= eu-central-1
 EKS_NODE_TYPE      ?= t3.small
 # Location of your merged kubeconfig file
 KUBECONFIG_FILE    ?= kube.config
-KCPCONFIG_FILE     ?= kcp.kubeconfig
+KCPCONFIG_FILE     ?= $(KUBECONFIG_FILE)
 KREW_ROOT          ?= $(HOME)/.krew
 ARGOCD_DOMAIN      ?= argocd.$(DOMAIN)
 
@@ -43,6 +43,10 @@ vpc-delete:
 	@aws cloudformation delete-stack \
 	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
 	  --region $(AWS_REGION)
+	@echo "Waiting for VPC CF stack deletion to complete..."
+	@aws cloudformation wait stack-delete-complete \
+	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
+	  --region $(AWS_REGION)
 
 eks-create:		
 	@echo -e "\033[1;32m[EKS] Creating/updating cluster via CloudFormation\033[0m"
@@ -52,13 +56,14 @@ eks-create:
 	    --stack-name $(EKS_CLUSTER_NAME) \
 	    --region $(AWS_REGION) \
 	    --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-	    --parameter-overrides ClusterName=$(EKS_CLUSTER_NAME)
+	    --parameter-overrides ClusterName=$(EKS_CLUSTER_NAME) CreateSpotRole=$$CREATE_SPOT_ROLE
 	@echo "Updating kubeconfig for cluster $(EKS_CLUSTER_NAME)"
-	@aws eks update-kubeconfig --name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --kubeconfig $(KUBECONFIG_FILE)
+	@aws eks update-kubeconfig --name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --kubeconfig $(KUBECONFIG_FILE) --alias eks
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config delete-context $(EKS_CLUSTER_NAME) || true
 	@echo "Applying Karpenter NodePool manifest..."
-	@kubectl apply -f manifests/core/eks/nodepool.yaml --kubeconfig $(KUBECONFIG_FILE)
-	@kubectl apply -f manifests/core/eks/ingressclass.yaml --kubeconfig $(KUBECONFIG_FILE)
-	@kubectl apply -f manifests/core/eks/storageclass.yaml --kubeconfig $(KUBECONFIG_FILE)
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/eks/nodepool.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/eks/ingressclass.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/eks/storageclass.yaml
 
 eks-delete:
 	@echo "Deleting EKS cluster via CloudFormation stack $(EKS_CLUSTER_NAME)"
@@ -83,22 +88,22 @@ argocd-install:
 
 kcp-install:
 	@echo -e "\033[1;32m[External-Dns] Deploying application\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f manifests/core/applications/external-dns.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application external-dns
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/external-dns.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application external-dns
 	@echo -e "\033[1;32m[Cert-Manager] Deploying application\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f manifests/core/applications/cert-manager.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application cert-manager
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/cert-manager.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application cert-manager
 	@echo -e "\033[1;32m[ACK] Deploying application\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f manifests/core/applications/ack.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application ack
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/ack.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application ack
 	@echo -e "\033[1;32m[KCP] Deploying application\033[0m"
-	@DOMAIN=$(DOMAIN) envsubst < manifests/core/applications/kcp.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f -
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application kcp
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io certificates.cert-manager.io
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f manifests/core/certificates/clusterissuer.yaml
-	@DOMAIN=$(DOMAIN) envsubst < manifests/core/certificates/certificate-argocd.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" apply -f -
+	@DOMAIN=$(DOMAIN) envsubst < manifests/core/applications/kcp.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application kcp
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io certificates.cert-manager.io
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/certificates/clusterissuer.yaml
+	@DOMAIN=$(DOMAIN) envsubst < manifests/core/certificates/certificate-argocd.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
 
 kcp-setup-kubectl:
 	@echo -e "\033[1;32m[Kubectl plugin setup] Krew and KCP plugins\033[0m"
@@ -136,9 +141,9 @@ kcp-create-kubeconfig:
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster root --server https://$(HOSTNAME):8443/clusters/root --certificate-authority=tmp/ca.crt
 	@echo "Setting kcp-admin credentials in kcp.kubeconfig..."
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-credentials kcp-admin --client-certificate=tmp/client.crt --client-key=tmp/client.key
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context base --cluster=base --user=kcp-admin
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context root --cluster=root --user=kcp-admin
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config use-context root
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-base --cluster=base --user=kcp-admin
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-root --cluster=root --user=kcp-admin
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config use-context kcp-root
 
 clean:
 	@echo -e "\033[1;32m[Clean] Deleting Argo CD applications...\033[0m"

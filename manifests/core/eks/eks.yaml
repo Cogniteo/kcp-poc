@@ -7,7 +7,24 @@ Parameters:
   ClusterName:
     Type: String
     Description: EKS cluster name to create
+  CreateSpotRole:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+Conditions:
+  NeedSpotRole:
+    Fn::Equals:
+      - !Ref CreateSpotRole
+      - "true"
 Resources:
+  SpotServiceLinkedRole:
+    Condition: NeedSpotRole
+    Type: AWS::IAM::ServiceLinkedRole
+    Properties:
+      AWSServiceName: spot.amazonaws.com
+      Description: "Service-linked role for EC2 Spot Instances"
   AutoModeNodeRole:
     Type: AWS::IAM::Role
     Properties:
@@ -283,6 +300,23 @@ Resources:
     DependsOn:
       - ControlPlane
 
+  BackstageRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ClusterName}-backstage-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - pods.eks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+
 Outputs:
   ExternalDNSRoleArn:
     Description: "ARN of the IAM role for ExternalDNS"
@@ -299,3 +333,8 @@ Outputs:
     Value: !GetAtt AckControllerRole.Arn
     Export:
       Name: !Sub "${ClusterName}-ackcontroller-role-arn"
+  BackstageRoleArn:
+    Description: "ARN of the IAM role for Backstage"
+    Value: !GetAtt BackstageRole.Arn
+    Export:
+      Name: !Sub "${ClusterName}-backstage-role-arn"

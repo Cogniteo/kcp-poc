@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://kubernetes-sigs.github.io/external-dns/
     chart: external-dns
-    targetRevision: "6.4.0"
+    targetRevision: "1.16.1"
     helm:
       releaseName: external-dns
       valuesObject:
@@ -16,7 +16,7 @@ spec:
         aws:
           region: eu-central-1
         serviceAccount:
-          create: false
+          create: true
           name: external-dns
   destination:
     server: https://kubernetes.default.svc
