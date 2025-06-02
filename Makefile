@@ -20,7 +20,7 @@ ARGOCD_DOMAIN      ?= argocd.$(DOMAIN)
 .PHONY: all kcp providers cli vpc-create cognito-create cognito-delete eks \
         kcp kcp-create-cluster install-argocd-platform kcp-provision-cluster \
         provider providers-create-cluster install-argocd-providers providers-provision-cluster providers-expose-db-api \
-        cli kcp-setup-kubectl kcp-delete clean eks-create eks-delete up down
+        cli kcp-setup-kubectl kcp-delete clean eks-create eks-delete up down deploy-controllers
 
 all: kcp providers cli
 
@@ -111,7 +111,7 @@ kcp-install:
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/certificates/clusterissuer.yaml
-	@DOMAIN=$(DOMAIN) envsubst < manifests/core/certificates/certificate-argocd.yaml | kubectl --kubeconfige="$(KUBECONFIG_FILE)" --context eks apply -f -
+	@DOMAIN=$(DOMAIN) envsubst < manifests/core/certificates/certificate-argocd.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
 	@echo -e "\033[1;32m[Cognito] Deploying ACK UserPool\033[0m"
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/cognito/userpool.yaml
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=ACK.ResourceSynced --timeout=300s userpool kcp-userpool
@@ -161,6 +161,20 @@ kcp-create-kubeconfig:
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-base --cluster=base --user=kcp-admin
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-root --cluster=root --user=kcp-admin
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config use-context kcp-root
+
+deploy-controllers:
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context eks; \
+	export KUBECONFIG="$(KUBECONFIG_FILE)"; \
+	ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text); \
+	TAG=$$(date +%s); \
+	IMG=$$ECR_URI:$$TAG; \
+	echo "Building and pushing controller image $$IMG"; \
+	$(MAKE) -C controllers/users docker-buildx IMG=$$IMG PLATFORMS="linux/amd64,linux/arm64"; \
+	REGISTRY=$$(echo $$ECR_URI | cut -d/ -f1); \
+	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $$REGISTRY; \
+	$(MAKE) -C controllers/users docker-push IMG=$$IMG; \
+	echo "Deploying controller to cluster"; \
+	$(MAKE) -C controllers/users deploy IMG=$$IMG KUBECTL="kubectl --kubeconfig=$(CURDIR)/$(KUBECONFIG_FILE)"
 
 clean:
 	@echo -e "\033[1;32m[Clean] Deleting Argo CD applications...\033[0m"

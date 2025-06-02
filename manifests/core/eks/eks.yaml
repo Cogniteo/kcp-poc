@@ -349,7 +349,17 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/ReadOnlyAccess
 
+  ControllersRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${ClusterName}-controllers"
+
 Outputs:
+  ControllersRepositoryUri:
+    Description: "Full ECR repository URI for controllers"
+    Value: !GetAtt ControllersRepository.RepositoryUri
+    Export:
+      Name: !Sub "${ClusterName}-controllers-repository-uri"
   ExternalDNSRoleArn:
     Description: "ARN of the IAM role for ExternalDNS"
     Value: !GetAtt ExternalDnsRole.Arn
