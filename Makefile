@@ -17,10 +17,10 @@ KREW_ROOT          ?= $(HOME)/.krew
 ARGOCD_DOMAIN      ?= argocd.$(DOMAIN)
 
 
-.PHONY: all kcp providers cli vpc-create eks \
+.PHONY: all kcp providers cli vpc-create cognito-create cognito-delete eks \
         kcp kcp-create-cluster install-argocd-platform kcp-provision-cluster \
         provider providers-create-cluster install-argocd-providers providers-provision-cluster providers-expose-db-api \
-        cli kcp-setup-kubectl clean eks-create eks-delete up down
+        cli kcp-setup-kubectl kcp-delete clean eks-create eks-delete up down
 
 all: kcp providers cli
 
@@ -50,8 +50,16 @@ vpc-delete:
 
 eks-create:		
 	@echo -e "\033[1;32m[EKS] Creating/updating cluster via CloudFormation\033[0m"
-	@aws iam create-service-linked-role --aws-service-name spot.amazonaws.com > /dev/null 2>&1 || true
-	@aws cloudformation deploy \
+	@echo "Checking if SpotServiceLinkedRole exists..."; \
+	if aws iam get-role --role-name AWSServiceRoleForEC2Spot >/dev/null 2>&1; then \
+	    echo "SpotServiceLinkedRole already exists. Skipping creation."; \
+	    CREATE_SPOT_ROLE=false; \
+	else \
+	    echo "SpotServiceLinkedRole not found. It will be created by CloudFormation."; \
+	    CREATE_SPOT_ROLE=true; \
+	fi; \
+	echo "Creating CloudFormation stack $(EKS_CLUSTER_NAME) with CreateSpotRole=$$CREATE_SPOT_ROLE"; \
+	aws cloudformation deploy \
 	    --template-file manifests/core/eks/eks.yaml \
 	    --stack-name $(EKS_CLUSTER_NAME) \
 	    --region $(AWS_REGION) \
@@ -103,7 +111,16 @@ kcp-install:
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/certificates/clusterissuer.yaml
-	@DOMAIN=$(DOMAIN) envsubst < manifests/core/certificates/certificate-argocd.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
+	@DOMAIN=$(DOMAIN) envsubst < manifests/core/certificates/certificate-argocd.yaml | kubectl --kubeconfige="$(KUBECONFIG_FILE)" --context eks apply -f -
+	@echo -e "\033[1;32m[Cognito] Deploying ACK UserPool\033[0m"
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/cognito/userpool.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=ACK.ResourceSynced --timeout=300s userpool kcp-userpool
+
+kcp-delete:
+	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete certificate argocd-elb-cert -n ack-system --ignore-not-found || true
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete clusterissuer selfsigned-cluster-issuer --ignore-not-found || true
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete userpool kcp-userpool --ignore-not-found || true
 
 kcp-setup-kubectl:
 	@echo -e "\033[1;32m[Kubectl plugin setup] Krew and KCP plugins\033[0m"
