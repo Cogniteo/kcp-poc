@@ -162,19 +162,22 @@ kcp-create-kubeconfig:
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-root --cluster=root --user=kcp-admin
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config use-context kcp-root
 
-deploy-controllers:
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context eks; \
-	export KUBECONFIG="$(KUBECONFIG_FILE)"; \
-	ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text); \
-	TAG=$$(date +%s); \
-	IMG=$$ECR_URI:$$TAG; \
-	echo "Building and pushing controller image $$IMG"; \
-	$(MAKE) -C controllers/users docker-buildx IMG=$$IMG PLATFORMS="linux/amd64,linux/arm64"; \
-	REGISTRY=$$(echo $$ECR_URI | cut -d/ -f1); \
-	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $$REGISTRY; \
-	$(MAKE) -C controllers/users docker-push IMG=$$IMG; \
-	echo "Deploying controller to cluster"; \
-	$(MAKE) -C controllers/users deploy IMG=$$IMG KUBECTL="kubectl --kubeconfig=$(CURDIR)/$(KUBECONFIG_FILE)"
+controllers-deploy:
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context eks
+	@ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text) && \
+	TAG=$$(date +%s) && \
+	IMG=$${ECR_URI}:$${TAG} && \
+	REGISTRY=$$(echo $${ECR_URI} | cut -d/ -f1) && \
+	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $${REGISTRY} && \
+	echo "Building and pushing controller image $${IMG}" && \
+	$(MAKE) -C controllers/users docker-buildx IMG=$${IMG} PLATFORMS="linux/amd64,linux/arm64" && \
+	echo "Deploying controller to cluster" && \
+	$(MAKE) -C controllers/users deploy IMG=$${IMG} KUBECTL="kubectl --kubeconfig=$(CURDIR)/$(KUBECONFIG_FILE)"
+
+kcp-deploy-sample:
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -k controllers/users/config/crd
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/workspace.yaml
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f controllers/users/config/samples/kcp_v1alpha1_user.yaml
 
 clean:
 	@echo -e "\033[1;32m[Clean] Deleting Argo CD applications...\033[0m"
