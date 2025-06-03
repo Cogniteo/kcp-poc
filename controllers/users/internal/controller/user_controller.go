@@ -35,7 +35,8 @@ import (
 // UserReconciler reconciles a User object
 type UserReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme         *runtime.Scheme
+	ProviderClient client.Client
 }
 
 // +kubebuilder:rbac:groups=kcp.cogniteo.io,resources=users,verbs=get;list;watch;create;update;patch;delete
