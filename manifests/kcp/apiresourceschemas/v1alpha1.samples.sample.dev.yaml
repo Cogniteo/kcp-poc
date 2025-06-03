@@ -1,0 +1,31 @@
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIResourceSchema
+metadata:
+  name: v1alpha1.samples.sample.dev
+spec:
+  group: sample.dev
+  names:
+    kind: Sample
+    plural: samples
+    singular: sample
+    listKind: SampleList
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                replicas:
+                  type: integer
+                image:
+                  type: string
+              required:
+                - image
+          required:
+            - spec
