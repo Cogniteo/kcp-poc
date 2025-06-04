@@ -5,7 +5,7 @@ metadata:
 spec:
   defaultAPIBindings:
     - export: users
-      path: "root"
+      path: root
 ---
 kind: Workspace
 apiVersion: tenancy.kcp.io/v1alpha1
@@ -14,16 +14,15 @@ metadata:
 spec:
   type:
     name: users
+    path: root
 ---
 apiVersion: apis.kcp.io/v1alpha1
 kind: APIExport
 metadata:
-  name: kcp.cogniteo.io
+  name: users
 spec:
   latestResourceSchemas:
     - v1alpha1.users.kcp.cogniteo.io
   permissionClaims:
     - all: true
       resource: secrets
----
-

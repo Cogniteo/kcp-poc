@@ -1,7 +1,0 @@
-apiVersion: apis.kcp.io/v1alpha1
-kind: APIExport
-metadata:
-  name: sample.dev
-spec:
-  latestResourceSchemas:
-    - v1alpha1.samples.sample.dev

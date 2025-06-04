@@ -16,13 +16,21 @@ KCPCONFIG_FILE     ?= $(KUBECONFIG_FILE)
 KREW_ROOT          ?= $(HOME)/.krew
 ARGOCD_DOMAIN      ?= argocd.$(DOMAIN)
 
+# Variables for TLS Secret
+K8S_NAMESPACE_FOR_SECRET ?= users-system
+TLS_SECRET_NAME ?= kcp-controller-certs
+CLIENT_CERT_FILE ?= tmp/client.crt
+CLIENT_KEY_FILE ?= tmp/client.key
+CA_CERT_FILE ?= tmp/ca.crt
+
 
 .PHONY: all kcp providers cli vpc-create cognito-create cognito-delete eks \
         kcp kcp-create-cluster install-argocd-platform kcp-provision-cluster \
         provider providers-create-cluster install-argocd-providers providers-provision-cluster providers-expose-db-api \
-        cli kcp-setup-kubectl kcp-delete clean eks-create eks-delete up down deploy-controllers
+        cli kcp-setup-kubectl kcp-delete clean eks-create eks-delete up down deploy-controllers \
+        create-tls-secret delete-tls-secret
 
-all: kcp providers cli
+all: up
 
 eks: eks-create
 kcp: kcp-create-cluster install-argocd-platform kcp-provision-cluster
@@ -162,7 +170,34 @@ kcp-create-kubeconfig:
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-root --cluster=root --user=kcp-admin
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config use-context kcp-root
 
-controllers-deploy:
+controllers-create-tls-secret:
+	@echo -e "\033[1;32m[TLS Secret] Creating/updating TLS secret $(TLS_SECRET_NAME) in namespace $(K8S_NAMESPACE_FOR_SECRET) using context eks\033[0m"
+	@if [ ! -f "$(CLIENT_CERT_FILE)" ]; then \
+		echo "Error: Client certificate file $(CLIENT_CERT_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(CLIENT_KEY_FILE)" ]; then \
+		echo "Error: Client key file $(CLIENT_KEY_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(CA_CERT_FILE)" ]; then \
+		echo "Error: CA certificate file $(CA_CERT_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded."; \
+		exit 1; \
+	fi
+	@echo "Creating/Updating secret $(TLS_SECRET_NAME)..."
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks create secret generic $(TLS_SECRET_NAME) \
+		--from-file=tls.crt=$(CLIENT_CERT_FILE) \
+		--from-file=tls.key=$(CLIENT_KEY_FILE) \
+		--from-file=ca.crt=$(CA_CERT_FILE) \
+		--namespace=$(K8S_NAMESPACE_FOR_SECRET) \
+		--dry-run=client -o yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
+
+controllers-delete-tls-secret:
+	@echo -e "\033[1;31m[TLS Secret] Deleting TLS secret $(TLS_SECRET_NAME) from namespace $(K8S_NAMESPACE_FOR_SECRET) using context eks\033[0m"
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete secret $(TLS_SECRET_NAME) \
+		--namespace=$(K8S_NAMESPACE_FOR_SECRET) --ignore-not-found=true
+
+controllers-deploy: controllers-create-tls-secret
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context eks
 	@ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text) && \
 	TAG=$$(date +%s) && \
@@ -175,10 +210,12 @@ controllers-deploy:
 	$(MAKE) -C controllers/users deploy IMG=$${IMG} KUBECTL="kubectl --kubeconfig=$(CURDIR)/$(KUBECONFIG_FILE)"
 
 kcp-deploy-sample:
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -k controllers/users/config/crd
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.kcp.cogniteo.io.yaml
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/workspace.yaml
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f controllers/users/config/samples/kcp_v1alpha1_user.yaml
-
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster users --server https://$(HOSTNAME):8443/clusters/root:users --certificate-authority=tmp/ca.crt
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context users --cluster=users --user=kcp-admin
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context users apply -f manifests/kcp/users/sample-user.yml
+	
 clean:
 	@echo -e "\033[1;32m[Clean] Deleting Argo CD applications...\033[0m"
 	@kubectl --kubeconfig=$(KUBECONFIG_FILE) -n argocd delete applications --all || true

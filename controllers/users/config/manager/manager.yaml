@@ -57,12 +57,16 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+        fsGroup: 1001
       containers:
       - command:
         - /manager
         args:
-          - --leader-elect
           - --health-probe-bind-address=:8081
+          - --client-cert=/etc/kcp-certs/tls.crt
+          - --client-key=/etc/kcp-certs/tls.key
+          - --ca-cert=/etc/kcp-certs/ca.crt
+          - --virtual-workspace-url=https://api.kcp.piotrjanik.dev:8443/services/apiexport/root/users
         image: controller:latest
         name: manager
         ports: []
@@ -92,7 +96,14 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-        volumeMounts: []
-      volumes: []
+        volumeMounts:
+        - name: tls-certs
+          mountPath: /etc/kcp-certs
+          readOnly: true
+      volumes:
+      - name: tls-certs
+        secret:
+          secretName: kcp-controller-certs # Ensure this Secret exists with keys: tls.crt, tls.key, ca.crt
+          defaultMode: 0400
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

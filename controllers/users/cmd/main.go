@@ -23,12 +23,11 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/client-go/rest"
-
-	"k8s.io/apimachinery/pkg/runtime"
+	apisv1alpha1 "github.com/kcp-dev/kcp/sdk/apis/apis/v1alpha1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -44,23 +43,25 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(kcpv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(clientgoscheme.AddToScheme(clientgoscheme.Scheme))
+	utilruntime.Must(kcpv1alpha1.AddToScheme(clientgoscheme.Scheme))
+	utilruntime.Must(apisv1alpha1.AddToScheme(clientgoscheme.Scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
 // nolint:gocyclo
 func main() {
+	var clientCertPath string
+	var clientKeyPath string
+	var caCertPath string
+	var virtualWorkspaceUrl string
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
-	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
@@ -69,10 +70,12 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", true,
-		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&clientCertPath, "client-cert", "", "Path to the client certificate (PEM format) for TLS authentication.")
+	flag.StringVar(&clientKeyPath, "client-key", "", "Path to the client key (PEM format) for TLS authentication.")
+	flag.StringVar(&caCertPath, "ca-cert", "", "Path to the CA certificate (PEM format) for TLS server verification.")
+	flag.StringVar(&virtualWorkspaceUrl, "virtual-workspace-url", "", "The URL of the virtual workspace (e.g., https://kcp.example.com/clusters/org_myorg_workspace_myworkspace). This will override the host in the kubeconfig.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -105,12 +108,28 @@ func main() {
 	// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/metrics/server
 	// - https://book.kubebuilder.io/reference/metrics.html
 	metricsServerOptions := metricsserver.Options{
-		BindAddress:   metricsAddr,
-		SecureServing: secureMetrics,
-		TLSOpts:       tlsOpts,
+		BindAddress: metricsAddr,
+		TLSOpts:     tlsOpts,
 	}
 	cfg := ctrl.GetConfigOrDie()
 	cfg = rest.CopyConfig(cfg)
+
+	if virtualWorkspaceUrl != "" {
+		cfg.Host = virtualWorkspaceUrl
+		setupLog.Info("using virtual workspace URL for REST client", "url", virtualWorkspaceUrl)
+	}
+
+	// TLS authentication for REST client
+	if clientCertPath != "" {
+		cfg.TLSClientConfig.CertFile = clientCertPath
+	}
+	if clientKeyPath != "" {
+		cfg.TLSClientConfig.KeyFile = clientKeyPath
+	}
+	if caCertPath != "" {
+		cfg.TLSClientConfig.CAFile = caCertPath
+	}
+
 	provider, err := apiexport.New(cfg, apiexport.Options{})
 	if err != nil {
 		setupLog.Error(err, "unable to create apiexport provider")
@@ -118,23 +137,12 @@ func main() {
 	}
 
 	mgr, err := mcmanager.New(cfg, provider, ctrl.Options{
-		Scheme:                 scheme,
+		Scheme:                 clientgoscheme.Scheme,
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "fe9d2d78.cogniteo.io",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
