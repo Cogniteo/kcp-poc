@@ -16,11 +16,13 @@ spec:
         kcpFrontProxy:
           v: 9
           service:
-            type: LoadBalancer
+            type: ClusterIP
+          ingress:
+            enabled: true
+            ingressClassName: nginx
             annotations:
-              service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-              service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
               external-dns.alpha.kubernetes.io/hostname: "api.${DOMAIN}"
+              nginx.ingress.kubernetes.io/backend-protocol: HTTPS
         etcd:
           resources:
             requests:

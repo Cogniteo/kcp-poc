@@ -15,6 +15,7 @@ KUBECONFIG_FILE    ?= kube.config
 KCPCONFIG_FILE     ?= $(KUBECONFIG_FILE)
 KREW_ROOT          ?= $(HOME)/.krew
 ARGOCD_DOMAIN      ?= argocd.$(DOMAIN)
+ACME_EMAIL         ?= admin@$(DOMAIN)
 
 # Variables for TLS Secret
 K8S_NAMESPACE_FOR_SECRET ?= users-system
@@ -28,7 +29,7 @@ CA_CERT_FILE ?= tmp/ca.crt
         kcp kcp-create-cluster install-argocd-platform kcp-provision-cluster \
         provider providers-create-cluster install-argocd-providers providers-provision-cluster providers-expose-db-api \
         cli kcp-setup-kubectl kcp-delete clean eks-create eks-delete up down deploy-controllers \
-        create-tls-secret delete-tls-secret
+        create-tls-secret delete-tls-secret ecr-clean
 
 all: up
 
@@ -47,7 +48,7 @@ vpc-create:
 	  --parameter-overrides ClusterName=$(EKS_CLUSTER_NAME)
 
 vpc-delete:
-	@echo "Deleting VPC resources via CloudFormation stack $(EKS_CLUSTER_NAME)-vpc"
+	@echo -e "\033[1;31m[VPC] Deleting VPC resources via CloudFormation stack $(EKS_CLUSTER_NAME)-vpc\033[0m"
 	@aws cloudformation delete-stack \
 	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
 	  --region $(AWS_REGION)
@@ -81,8 +82,8 @@ eks-create:
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/eks/ingressclass.yaml
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/eks/storageclass.yaml
 
-eks-delete:
-	@echo "Deleting EKS cluster via CloudFormation stack $(EKS_CLUSTER_NAME)"
+eks-delete: ecr-clean
+	@echo -e "\033[1;31m[EKS] Deleting EKS cluster via CloudFormation stack $(EKS_CLUSTER_NAME)\033[0m"
 	@aws cloudformation delete-stack \
 	  --stack-name $(EKS_CLUSTER_NAME) \
 	  --region $(AWS_REGION)
@@ -92,10 +93,10 @@ eks-delete:
 	  --region $(AWS_REGION)
 
 argocd-install:
-	@echo -e "\033[1;32m[Argo CD] Installing/upgrading release\033[0m"
-	@helm repo add argo https://argoproj.github.io/argo-helm || true
-	@helm repo update
-	@helm upgrade --install argocd argo/argo-cd --version 8.0.3 \
+	@echo -e "\033[1;32m[Argo CD] Installing/upgrading release\033[0m"; \
+	helm repo add argo https://argoproj.github.io/argo-helm || true; \
+	helm repo update; \
+	helm upgrade --install argocd argo/argo-cd --version 8.0.3 \
 	  --namespace argocd \
 	  --create-namespace \
 	  --kubeconfig "$(KUBECONFIG_FILE)" \
@@ -103,12 +104,17 @@ argocd-install:
 	  --values manifests/core/applications/argocd-values.yaml
 
 kcp-install:
+	@echo -e "\033[1;32m[Ingress-NGINX] Deploying application\033[0m"
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/ingress-nginx.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application ingress-nginx
 	@echo -e "\033[1;32m[External-Dns] Deploying application\033[0m"
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/external-dns.yaml
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application external-dns
 	@echo -e "\033[1;32m[Cert-Manager] Deploying application\033[0m"
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/cert-manager.yaml
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application cert-manager
+	@echo -e "\033[1;32m[Cert-Manager] Applying ClusterIssuers\033[0m"; \
+	ACME_EMAIL=$(ACME_EMAIL) envsubst < manifests/core/certificates/clusterissuer.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
 	@echo -e "\033[1;32m[ACK] Deploying application\033[0m"
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/ack.yaml
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application ack
@@ -133,13 +139,13 @@ kcp-delete:
 kcp-setup-kubectl:
 	@echo -e "\033[1;32m[Kubectl plugin setup] Krew and KCP plugins\033[0m"
 	@if command -v kubectl-krew > /dev/null 2>&1; then \
-	  echo "Krew is already installed. Skipping..."; \
+	  echo -e "\033[1;32m[Krew] Krew is already installed. Skipping...\033[0m"; \
 	else \
-	  echo "Installing Krew using Homebrew..."; \
+	  echo -e "\033[1;32m[Krew] Installing Krew using Homebrew...\033[0m"; \
 	  brew install krew; \
-	  echo "Krew installation complete. If needed, add $$HOME/.krew/bin to your PATH."; \
+	  echo -e "\033[1;32m[Krew] Krew installation complete. If needed, add $$HOME/.krew/bin to your PATH.\033[0m"; \
 	fi
-	@echo "Installing kcp plugins (kcp, ws, create-workspace) using Krew..."
+	@echo -e "\033[1;32m[Krew] Installing kcp plugins (kcp, ws, create-workspace) using Krew...\033[0m"
 	@kubectl krew index add kcp-dev https://github.com/kcp-dev/krew-index.git || true
 	@kubectl krew install kcp-dev/kcp
 	@kubectl krew install kcp-dev/ws
@@ -173,15 +179,15 @@ kcp-create-kubeconfig:
 controllers-create-tls-secret:
 	@echo -e "\033[1;32m[TLS Secret] Creating/updating TLS secret $(TLS_SECRET_NAME) in namespace $(K8S_NAMESPACE_FOR_SECRET) using context eks\033[0m"
 	@if [ ! -f "$(CLIENT_CERT_FILE)" ]; then \
-		echo "Error: Client certificate file $(CLIENT_CERT_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded."; \
+		echo -e "\033[1;31m[TLS Secret] Error: Client certificate file $(CLIENT_CERT_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded.\033[0m"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(CLIENT_KEY_FILE)" ]; then \
-		echo "Error: Client key file $(CLIENT_KEY_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded."; \
+		echo -e "\033[1;31m[TLS Secret] Error: Client key file $(CLIENT_KEY_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded.\033[0m"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(CA_CERT_FILE)" ]; then \
-		echo "Error: CA certificate file $(CA_CERT_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded."; \
+		echo -e "\033[1;31m[TLS Secret] Error: CA certificate file $(CA_CERT_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded.\033[0m"; \
 		exit 1; \
 	fi
 	@echo "Creating/Updating secret $(TLS_SECRET_NAME)..."
@@ -244,3 +250,20 @@ down:
 	@$(MAKE) eks-delete
 	@echo -e "\033[1;31m[DOWN] Deleting VPC resources\033[0m"
 	@$(MAKE) vpc-delete
+
+ecr-clean:
+	@echo -e "\033[1;33m[ECR] Cleaning Controllers ECR repository\033[0m"
+	@ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text) && \
+	if [ -z "$$ECR_URI" ]; then \
+	  echo -e "\033[1;33m[ECR] No ControllersRepositoryUri found. Skipping ECR cleanup.\033[0m"; \
+	else \
+	  REPO=$$(echo $$ECR_URI | cut -d/ -f2-); \
+	  COUNT=$$(aws ecr list-images --repository-name $$REPO --region $(AWS_REGION) --query 'length(imageIds)' --output text); \
+	  if [ "$$COUNT" -gt 0 ]; then \
+	    IDS=$$(aws ecr list-images --repository-name $$REPO --region $(AWS_REGION) --query 'imageIds[*]' --output json); \
+	    aws ecr batch-delete-image --repository-name $$REPO --region $(AWS_REGION) --image-ids "$$IDS"; \
+	    echo -e "\033[1;33m[ECR] Deleted $$COUNT images from $$REPO.\033[0m"; \
+	  else \
+	    echo -e "\033[1;33m[ECR] ECR repo $$REPO is already empty.\033[0m"; \
+	  fi; \
+	fi

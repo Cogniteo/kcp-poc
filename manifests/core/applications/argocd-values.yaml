@@ -5,17 +5,15 @@ configs:
 server:
   ingress:
     enabled: true
-    controller: aws
-    ingressClassName: alb
+    hosts:
+      - argocd.${DOMAIN}
+    tls:
+      - secretName: argocd-tls
+        hosts:
+          - argocd.${DOMAIN}
+    ingressClassName: nginx
     annotations:
-      alb.ingress.kubernetes.io/scheme: internet-facing
-      alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/backend-protocol: HTTP
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
-      alb.ingress.kubernetes.io/ssl-redirect: '443'
-    aws:
-      serviceType: ClusterIP
-      backendProtocolVersion: GRPC
+      cert-manager.io/cluster-issuer: letsencrypt
 dex:
   enabled: false
 notifications:
