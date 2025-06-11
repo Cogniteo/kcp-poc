@@ -13,6 +13,8 @@ spec:
       releaseName: ingress-nginx
       valuesObject:
         controller:
+          extraArgs:
+            enable-ssl-passthrough: true
           service:
             type: LoadBalancer
             annotations:

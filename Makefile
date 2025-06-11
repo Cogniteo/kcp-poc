@@ -113,6 +113,10 @@ kcp-install:
 	@echo -e "\033[1;32m[Cert-Manager] Deploying application\033[0m"
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/cert-manager.yaml
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application cert-manager
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io certificates.cert-manager.io
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io clusterissuers.cert-manager.io
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
 	@echo -e "\033[1;32m[Cert-Manager] Applying ClusterIssuers\033[0m"; \
 	ACME_EMAIL=$(ACME_EMAIL) envsubst < manifests/core/certificates/clusterissuer.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
 	@echo -e "\033[1;32m[ACK] Deploying application\033[0m"
@@ -120,19 +124,13 @@ kcp-install:
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application ack
 	@echo -e "\033[1;32m[KCP] Deploying application\033[0m"
 	@DOMAIN=$(DOMAIN) envsubst < manifests/core/applications/kcp.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application kcp
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io certificates.cert-manager.io
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/certificates/clusterissuer.yaml
-	@DOMAIN=$(DOMAIN) envsubst < manifests/core/certificates/certificate-argocd.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=480s application kcp
 	@echo -e "\033[1;32m[Cognito] Deploying ACK UserPool\033[0m"
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/cognito/userpool.yaml
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=ACK.ResourceSynced --timeout=300s userpool kcp-userpool
 
 kcp-delete:
 	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete certificate argocd-elb-cert -n ack-system --ignore-not-found || true
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete clusterissuer selfsigned-cluster-issuer --ignore-not-found || true
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete userpool kcp-userpool --ignore-not-found || true
 
@@ -157,19 +155,19 @@ kcp-create-kubeconfig:
 	@echo "Creating tmp directory if necessary..."
 	@mkdir -p tmp
 	@echo "Applying client certificate manifest to the platform cluster..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp apply -f manifests/kcp/cert.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp wait certificate.cert-manager.io --for=condition=ready cluster-admin-client-cert
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp apply -f manifests/kcp/cert.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp wait certificate.cert-manager.io --for=condition=ready cluster-admin-client-cert
 	echo "Extracting the KCP front proxy certificate to tmp/ca.crt..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp get secret kcp-front-proxy-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/ca.crt
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp get secret kcp-front-proxy-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/ca.crt
 	@echo "Extracting client certificate and key from secret..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/client.crt
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.key}' | base64 -d > tmp/client.key
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/client.crt
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.key}' | base64 -d > tmp/client.key
 	@chmod 600 tmp/client.crt tmp/client.key
 
 	echo "Configuring 'base' cluster in kcp.kubeconfig..."
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster base --server https://$(HOSTNAME):8443 --certificate-authority=tmp/ca.crt
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster base --server https://$(HOSTNAME):443 --certificate-authority=tmp/ca.crt
 	echo "Configuring 'root' cluster in kcp.kubeconfig..."
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster root --server https://$(HOSTNAME):8443/clusters/root --certificate-authority=tmp/ca.crt
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster root --server https://$(HOSTNAME):443/clusters/root --certificate-authority=tmp/ca.crt
 	@echo "Setting kcp-admin credentials in kcp.kubeconfig..."
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-credentials kcp-admin --client-certificate=tmp/client.crt --client-key=tmp/client.key
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-base --cluster=base --user=kcp-admin
@@ -218,7 +216,7 @@ controllers-deploy: controllers-create-tls-secret
 kcp-deploy-sample:
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.kcp.cogniteo.io.yaml
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/workspace.yaml
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster users --server https://$(HOSTNAME):8443/clusters/root:users --certificate-authority=tmp/ca.crt
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster users --server https://$(HOSTNAME):443/clusters/root:users --certificate-authority=tmp/ca.crt
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context users --cluster=users --user=kcp-admin
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context users apply -f manifests/kcp/users/sample-user.yml
 	

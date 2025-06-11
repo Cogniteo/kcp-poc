@@ -17,17 +17,18 @@ spec:
           v: 9
           service:
             type: ClusterIP
+          certificateIssuer:
+            name: letsencrypt
+            kind: ClusterIssuer
           ingress:
             enabled: true
             ingressClassName: nginx
             annotations:
-              external-dns.alpha.kubernetes.io/hostname: "api.${DOMAIN}"
-              nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+              nginx.ingress.kubernetes.io/ssl-passthrough: "true"
         etcd:
           resources:
             requests:
               memory: 256Mi
-
         kcp:
           v: 9
           volumeClassName: "standard"
