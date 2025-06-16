@@ -18,7 +18,7 @@ ARGOCD_DOMAIN      ?= argocd.$(DOMAIN)
 ACME_EMAIL         ?= admin@$(DOMAIN)
 
 # Variables for TLS Secret
-K8S_NAMESPACE_FOR_SECRET ?= users-system
+K8S_NAMESPACE_FOR_SECRET ?= controllers
 TLS_SECRET_NAME ?= kcp-controller-certs
 CLIENT_CERT_FILE ?= tmp/client.crt
 CLIENT_KEY_FILE ?= tmp/client.key
@@ -128,6 +128,9 @@ kcp-install:
 	@echo -e "\033[1;32m[Cognito] Deploying ACK UserPool\033[0m"
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/cognito/userpool.yaml
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=ACK.ResourceSynced --timeout=300s userpool kcp-userpool
+	@echo -e "\033[1;32m[Prometheus] Deploying application\033[0m"
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/prometheus-stack.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application prometheus-stack
 
 kcp-delete:
 	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"
@@ -201,8 +204,10 @@ controllers-delete-tls-secret:
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete secret $(TLS_SECRET_NAME) \
 		--namespace=$(K8S_NAMESPACE_FOR_SECRET) --ignore-not-found=true
 
-controllers-deploy: controllers-create-tls-secret
+controllers-deploy:
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context eks
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" create namespace controllers || true
+	@$(MAKE) controllers-create-tls-secret
 	@ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text) && \
 	TAG=$$(date +%s) && \
 	IMG=$${ECR_URI}:$${TAG} && \
@@ -218,7 +223,8 @@ kcp-deploy-sample:
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/workspace.yaml
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster users --server https://$(HOSTNAME):443/clusters/root:users --certificate-authority=tmp/ca.crt
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context users --cluster=users --user=kcp-admin
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context users apply -f manifests/kcp/users/sample-user.yml
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context users create namespace default || true
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context users apply -n default -f manifests/kcp/users/sample-user.yml
 	
 clean:
 	@echo -e "\033[1;32m[Clean] Deleting Argo CD applications...\033[0m"

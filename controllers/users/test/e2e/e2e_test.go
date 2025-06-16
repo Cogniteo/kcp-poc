@@ -31,7 +31,7 @@ import (
 )
 
 // namespace where the project is deployed in
-const namespace = "users-system"
+const namespace = "controllers"
 
 // serviceAccountName created for the project
 const serviceAccountName = "users-controller-manager"

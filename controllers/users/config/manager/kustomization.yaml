@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: 227409710666.dkr.ecr.eu-central-1.amazonaws.com/kcp-cluster-controllers
-  newTag: "1748988681"
+  newTag: "1749848149"

@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -130,7 +131,9 @@ func main() {
 		cfg.TLSClientConfig.CAFile = caCertPath
 	}
 
-	provider, err := apiexport.New(cfg, apiexport.Options{})
+	provider, err := apiexport.New(cfg, apiexport.Options{
+		Scheme: clientgoscheme.Scheme,
+	})
 	if err != nil {
 		setupLog.Error(err, "unable to create apiexport provider")
 		os.Exit(1)
@@ -150,8 +153,9 @@ func main() {
 	}
 
 	if err := (&controller.UserReconciler{
-		Client: mgr.GetLocalManager().GetClient(),
-		Scheme: mgr.GetLocalManager().GetScheme(),
+		Client:  mgr.GetLocalManager().GetClient(),
+		Scheme:  mgr.GetLocalManager().GetScheme(),
+		Manager: mgr,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "User")
 		os.Exit(1)
@@ -166,9 +170,27 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		os.Exit(1)
+	}
+	ctx := signals.SetupSignalHandler()
+	if provider != nil {
+		setupLog.Info("Starting provider")
+		go func() {
+			if err := provider.Run(ctx, mgr); err != nil {
+				setupLog.Error(err, "unable to run provider")
+				os.Exit(1)
+			}
+		}()
+	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

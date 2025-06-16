@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,8 +36,8 @@ import (
 // UserReconciler reconciles a User object
 type UserReconciler struct {
 	client.Client
-	Scheme         *runtime.Scheme
-	ProviderClient client.Client
+	Scheme  *runtime.Scheme
+	Manager mcmanager.Manager
 }
 
 // +kubebuilder:rbac:groups=kcp.cogniteo.io,resources=users,verbs=get;list;watch;create;update;patch;delete
@@ -58,7 +59,12 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req mcreconcile.Request)
 
 	// Fetch the User instance
 	var user kcpv1alpha1.User
-	if err := r.Get(ctx, req.NamespacedName, &user); err != nil {
+	cl, err := r.Manager.GetCluster(ctx, req.ClusterName)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get cluster: %w", err)
+	}
+	client := cl.GetClient()
+	if err := client.Get(ctx, req.NamespacedName, &user); err != nil {
 		if errors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
@@ -71,7 +77,7 @@ func (r *UserReconciler) Reconcile(ctx context.Context, req mcreconcile.Request)
 	}
 	user.Annotations["kcp.cogniteo.io/lastReconciledAt"] = time.Now().Format(time.RFC3339)
 
-	if err := r.Update(ctx, &user); err != nil {
+	if err := client.Update(ctx, &user); err != nil {
 		log.Error(err, "Failed to update User annotation")
 		return ctrl.Result{}, err
 	}
