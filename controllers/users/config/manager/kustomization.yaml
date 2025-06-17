@@ -1,8 +1,0 @@
-resources:
-- manager.yaml
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-images:
-- name: controller
-  newName: 227409710666.dkr.ecr.eu-central-1.amazonaws.com/kcp-cluster-controllers
-  newTag: "1749848149"

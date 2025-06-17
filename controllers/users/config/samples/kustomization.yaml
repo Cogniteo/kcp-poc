@@ -1,4 +1,0 @@
-## Append samples of your project ##
-resources:
-- kcp_v1alpha1_user.yaml
-# +kubebuilder:scaffold:manifestskustomizesamples
