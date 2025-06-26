@@ -208,15 +208,9 @@ controllers-deploy:
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context eks
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" create namespace controllers || true
 	@$(MAKE) controllers-create-tls-secret
-	@ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text) && \
-	TAG=$$(date +%s) && \
-	IMG=$${ECR_URI}:$${TAG} && \
-	REGISTRY=$$(echo $${ECR_URI} | cut -d/ -f1) && \
-	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $${REGISTRY} && \
-	echo "Building and pushing controller image $${IMG}" && \
-	$(MAKE) -C controllers/users docker-buildx IMG=$${IMG} PLATFORMS="linux/amd64,linux/arm64" && \
-	echo "Deploying controller to cluster" && \
-	$(MAKE) -C controllers/users deploy IMG=$${IMG} KUBECTL="kubectl --kubeconfig=$(CURDIR)/$(KUBECONFIG_FILE)"
+	@IMG=ghcr.io/piotrjanik/kcp-users-controller:latest && \
+	@echo "Deploying kcp-users-controller using GHCR image $${IMG}" && \
+	@$(MAKE) -C ../kcp-users-controller deploy IMG=$${IMG} KUBECTL="kubectl --kubeconfig=$(CURDIR)/$(KUBECONFIG_FILE)"
 
 kcp-deploy-sample:
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.kcp.cogniteo.io.yaml
