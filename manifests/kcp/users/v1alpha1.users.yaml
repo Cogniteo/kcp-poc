@@ -1,9 +1,9 @@
 apiVersion: apis.kcp.io/v1alpha1
 kind: APIResourceSchema
 metadata:
-  name: v1alpha1.users.kcp.cogniteo.io
+  name: v1alpha1.users.kcp.piotrjanik.dev
 spec:
-  group: kcp.cogniteo.io
+  group: kcp.piotrjanik.dev
   names:
     kind: User
     listKind: UserList

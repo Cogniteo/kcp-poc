@@ -104,33 +104,8 @@ argocd-install:
 	  --values manifests/core/applications/argocd-values.yaml
 
 kcp-install:
-	@echo -e "\033[1;32m[Ingress-NGINX] Deploying application\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/ingress-nginx.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application ingress-nginx
-	@echo -e "\033[1;32m[External-Dns] Deploying application\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/external-dns.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application external-dns
-	@echo -e "\033[1;32m[Cert-Manager] Deploying application\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/cert-manager.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application cert-manager
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io certificates.cert-manager.io
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io clusterissuers.cert-manager.io
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
-	@echo -e "\033[1;32m[Cert-Manager] Applying ClusterIssuers\033[0m"; \
-	ACME_EMAIL=$(ACME_EMAIL) envsubst < manifests/core/certificates/clusterissuer.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
-	@echo -e "\033[1;32m[ACK] Deploying application\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/ack.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application ack
-	@echo -e "\033[1;32m[KCP] Deploying application\033[0m"
-	@DOMAIN=$(DOMAIN) envsubst < manifests/core/applications/kcp.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=480s application kcp
-	@echo -e "\033[1;32m[Cognito] Deploying ACK UserPool\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/cognito/userpool.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks wait --for=condition=ACK.ResourceSynced --timeout=300s userpool kcp-userpool
-	@echo -e "\033[1;32m[Prometheus] Deploying application\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/prometheus-stack.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=300s application prometheus-stack
+	@echo -e "\033[1;32m[ArgoCD] Deploying ApplicationSet\033[0m"
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/applicationset.yaml
 
 kcp-delete:
 	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"
@@ -213,7 +188,7 @@ controllers-deploy:
 	@$(MAKE) -C ../kcp-users-controller deploy IMG=$${IMG} KUBECTL="kubectl --kubeconfig=$(CURDIR)/$(KUBECONFIG_FILE)"
 
 kcp-deploy-sample:
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.kcp.cogniteo.io.yaml
+	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.yaml
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/workspace.yaml
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster users --server https://$(HOSTNAME):443/clusters/root:users --certificate-authority=tmp/ca.crt
 	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context users --cluster=users --user=kcp-admin

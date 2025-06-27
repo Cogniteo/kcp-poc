@@ -1,9 +1,9 @@
 apiVersion: apis.kcp.io/v1alpha1
 kind: APIResourceSchema
 metadata:
-  name: databases.platform.cogniteo.io
+  name: databases.platform.piotrjanik.dev
 spec:
-  group: platform.cogniteo.io
+  group: platform.piotrjanik.dev
   names:
     kind: Database
     listKind: DatabaseList
