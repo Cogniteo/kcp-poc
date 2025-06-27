@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kcp-users-controller
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/piotrjanik/kcp-users-controller
+    targetRevision: HEAD
+    path: config/default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: controllers
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
