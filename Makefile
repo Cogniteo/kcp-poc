@@ -106,6 +106,7 @@ argocd-install:
 kcp-install:
 	@echo -e "\033[1;32m[ArgoCD] Deploying ApplicationSet\033[0m"
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applicationset.yaml
+	ACME_EMAIL=$(ACME_EMAIL) envsubst < manifests/core/certificates/clusterissuer.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
 
 kcp-delete:
 	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"

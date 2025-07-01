@@ -9,8 +9,6 @@ spec:
         elements:
           - name: core
             path: manifests/core/applications
-          - name: certificate
-            path: manifests/core/certificates
           - name: cognito
             path: manifests/core/cognito
   template:
