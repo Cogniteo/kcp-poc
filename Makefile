@@ -101,11 +101,11 @@ argocd-install:
 	  --create-namespace \
 	  --kubeconfig "$(KUBECONFIG_FILE)" \
 	  --set global.domain="argocd.$(DOMAIN)" \
-	  --values manifests/core/applications/argocd-values.yaml
+	  --values manifests/core/argocd-values.yaml
 
 kcp-install:
 	@echo -e "\033[1;32m[ArgoCD] Deploying ApplicationSet\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applications/applicationset.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applicationset.yaml
 
 kcp-delete:
 	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"

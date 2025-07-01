@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kcp-applications
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - name: core
+            path: manifests/core/applications
+          - name: certificate
+            path: manifests/core/certificates
+          - name: cognito
+            path: manifests/core/cognito
+  template:
+    metadata:
+      name: '{{name}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/piotrjanik/kcp-poc
+        targetRevision: HEAD
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'platform'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

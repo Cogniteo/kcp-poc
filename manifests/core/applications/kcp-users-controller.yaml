@@ -11,7 +11,7 @@ spec:
     path: config/default
   destination:
     server: https://kubernetes.default.svc
-    namespace: controllers
+    namespace: platform
   syncPolicy:
     automated:
       prune: true
