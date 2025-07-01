@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://kcp-dev.github.io/helm-charts
     chart: kcp
-    targetRevision: 0.10.0
+    targetRevision: 0.10.1
     helm:
       releaseName: kcp
       valuesObject:
