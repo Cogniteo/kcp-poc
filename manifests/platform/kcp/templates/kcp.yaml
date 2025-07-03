@@ -1,0 +1,46 @@
+{{- /* KCP Application */ -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kcp
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kcp-dev.github.io/helm-charts
+    chart: kcp
+    targetRevision: {{ .Values.kcp.targetRevision | quote }}
+    helm:
+      releaseName: kcp
+      valuesObject:
+        externalHostname: {{ .Values.kcp.externalHostname | quote }}
+        kcpFrontProxy:
+          v: {{ .Values.kcp.kcpFrontProxy.v }}
+          service:
+            type: {{ .Values.kcp.kcpFrontProxy.service.type | quote }}
+        certificateIssuer:
+          name: {{ .Values.kcp.certificateIssuerName | quote }}
+          kind: {{ .Values.kcp.certificateIssuerKind | quote }}
+        ingress:
+          enabled: {{ .Values.kcp.ingress.enabled }}
+          ingressClassName: {{ .Values.kcp.ingress.ingressClassName | quote }}
+          annotations:
+            nginx.ingress.kubernetes.io/ssl-passthrough: {{ index .Values.kcp.ingress.annotations "nginx.ingress.kubernetes.io/ssl-passthrough" | quote }}
+        etcd:
+          resources:
+            requests:
+              memory: {{ .Values.kcp.etcd.memory | quote }}
+        kcp:
+          v: {{ .Values.kcp.v }}
+          volumeClassName: {{ .Values.kcp.volumeClassName | quote }}
+        audit:
+          enabled: {{ .Values.kcp.auditEnabled }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kcp
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true

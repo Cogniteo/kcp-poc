@@ -4,25 +4,38 @@ metadata:
   name: kcp-applications
   namespace: argocd
 spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
   generators:
     - list:
         elements:
-          - name: core
-            path: manifests/core/applications
+          - name: middleware
+            path: manifests/platform/middleware
+          - name: kcp
+            path: manifests/platform/kcp
+            valuesObject:
+              externalHostname: ${HOSTNAME}
           - name: cognito
             path: manifests/core/cognito
+          - name: certificates
+            path: manifests/platform/certificates
+            valuesObject:
+              letsencrypt:
+                email: ${ACME_EMAIL}
   template:
     metadata:
-      name: '{{name}}'
+      name: "{{name}}"
     spec:
       project: default
       source:
         repoURL: https://github.com/piotrjanik/kcp-poc
         targetRevision: HEAD
-        path: '{{path}}'
+        path: "{{path}}"
+        helm:
+          valuesObject: {{ .valuesObject | toYaml }}
       destination:
         server: https://kubernetes.default.svc
-        namespace: 'argocd'
+        namespace: "argocd"
       syncPolicy:
         automated:
           prune: true

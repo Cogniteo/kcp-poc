@@ -13,8 +13,6 @@ spec:
       releaseName: external-dns
       valuesObject:
         provider: aws
-        aws:
-          region: eu-central-1
         serviceAccount:
           create: true
           name: external-dns

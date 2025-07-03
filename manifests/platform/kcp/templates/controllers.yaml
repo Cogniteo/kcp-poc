@@ -1,0 +1,25 @@
+{{- /* Loop over each controller in values.controllers */ -}}
+{{- range .Values.controllers }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .name | quote }}
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ .repoURL | quote }}
+    targetRevision: {{ .targetRevision | quote }}
+    path: {{ .path | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ .destinationNamespace | quote }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+{{- end }}
+

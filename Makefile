@@ -41,7 +41,7 @@ cli: kcp-setup-kubectl
 vpc-create:
 	@echo -e "\033[1;32m[VPC] Creating/updating via CloudFormation\033[0m"
 	@aws cloudformation deploy \
-	  --template-file manifests/core/eks/vpc.yaml \
+	  --template-file manifests/eks/vpc.yaml \
 	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
 	  --region $(AWS_REGION) \
 	  --capabilities CAPABILITY_IAM \
@@ -69,7 +69,7 @@ eks-create:
 	fi; \
 	echo "Creating CloudFormation stack $(EKS_CLUSTER_NAME) with CreateSpotRole=$$CREATE_SPOT_ROLE"; \
 	aws cloudformation deploy \
-	    --template-file manifests/core/eks/eks.yaml \
+	    --template-file manifests/eks/eks.yaml \
 	    --stack-name $(EKS_CLUSTER_NAME) \
 	    --region $(AWS_REGION) \
 	    --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
@@ -78,9 +78,9 @@ eks-create:
 	@aws eks update-kubeconfig --name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --kubeconfig $(KUBECONFIG_FILE) --alias eks
 	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config delete-context $(EKS_CLUSTER_NAME) || true
 	@echo "Applying Karpenter NodePool manifest..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/eks/nodepool.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/eks/ingressclass.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/eks/storageclass.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/eks/nodepool.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/eks/ingressclass.yaml
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/eks/storageclass.yaml
 
 eks-delete: ecr-clean
 	@echo -e "\033[1;31m[EKS] Deleting EKS cluster via CloudFormation stack $(EKS_CLUSTER_NAME)\033[0m"
@@ -101,12 +101,11 @@ argocd-install:
 	  --create-namespace \
 	  --kubeconfig "$(KUBECONFIG_FILE)" \
 	  --set global.domain="argocd.$(DOMAIN)" \
-	  --values manifests/core/argocd-values.yaml
+	  --values manifests/platform/argocd-values.yaml
 
 kcp-install:
 	@echo -e "\033[1;32m[ArgoCD] Deploying ApplicationSet\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/core/applicationset.yaml
-	ACME_EMAIL=$(ACME_EMAIL) envsubst < manifests/core/certificates/clusterissuer.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
+	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/platform/applicationset.yaml
 
 kcp-delete:
 	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"

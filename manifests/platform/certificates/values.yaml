@@ -1,0 +1,19 @@
+# Default values for certificates chart
+
+selfSigned:
+  # Name of the self-signed ClusterIssuer
+  name: "selfsigned-cluster-issuer"
+  enabled: true
+
+letsencrypt:
+  # Name of the ACME ClusterIssuer
+  name: "letsencrypt"
+  enabled: true
+  # ACME server URL
+  server: "https://acme-v02.api.letsencrypt.org/directory"
+  # Email used for ACME registration; override in values or via --set
+  email: ""
+  # Secret name for ACME account private key
+  privateKeySecretRefName: "letsencrypt"
+  # Ingress class for HTTP01 challenge
+  ingressClassName: "nginx"

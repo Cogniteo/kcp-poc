@@ -1,0 +1,6 @@
+apiVersion: v2
+name: core-applications
+description: Helm chart for ArgoCD Application definitions
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

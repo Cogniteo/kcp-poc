@@ -1,0 +1,72 @@
+# Default values for core-applications chart
+
+ack:
+  # ECR repo URL if overriding
+  repoURL: "public.ecr.aws/aws-controllers-k8s"
+  targetRevision: "46.25.10"
+  installCRDs: true
+  cognitoidentityprovider:
+    enabled: true
+    aws:
+      region: "eu-central-1"
+  acm:
+    enabled: true
+    aws:
+      region: "eu-central-1"
+  destinationNamespace: "ack-system"
+
+certManager:
+  targetRevision: "1.17.1"
+  installCRDs: true
+
+externalDns:
+  targetRevision: "1.16.1"
+  provider: "aws"
+  aws:
+    region: "eu-central-1"
+  serviceAccount:
+    create: true
+    name: "external-dns"
+
+ingressNginx:
+  targetRevision: "4.12.3"
+  controller:
+    extraArgs:
+      enable-ssl-passthrough: true
+    service:
+      type: "LoadBalancer"
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+
+kcpUsersController:
+  repoURL: "https://github.com/piotrjanik/kcp-users-controller"
+  targetRevision: "HEAD"
+  path: "config/default"
+  destinationNamespace: "platform"
+
+kcp:
+  targetRevision: "0.10.1"
+  externalHostname: "api.kcp.piotrjanik.dev"
+  certificateIssuerName: "letsencrypt"
+  certificateIssuerKind: "ClusterIssuer"
+  kcpFrontProxy:
+    v: 9
+    service:
+      type: "ClusterIP"
+  ingress:
+    enabled: true
+    ingressClassName: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+  etcd:
+    memory: "256Mi"
+  v: 9
+  volumeClassName: "standard"
+  auditEnabled: false
+controllers:
+  - name: kcp-users-controller
+    repoURL: "https://github.com/piotrjanik/kcp-users-controller"
+    targetRevision: "HEAD"
+    path: "config/default"
+    destinationNamespace: "platform"
