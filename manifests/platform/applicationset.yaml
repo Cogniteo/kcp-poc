@@ -11,12 +11,14 @@ spec:
         elements:
           - name: middleware
             path: manifests/platform/middleware
+            valuesObject: {}
           - name: kcp
             path: manifests/platform/kcp
             valuesObject:
-              externalHostname: ${HOSTNAME}
+              externalHostname: ${KCP_HOSTNAME}
           - name: cognito
             path: manifests/core/cognito
+            valuesObject: {}
           - name: certificates
             path: manifests/platform/certificates
             valuesObject:
@@ -24,15 +26,15 @@ spec:
                 email: ${ACME_EMAIL}
   template:
     metadata:
-      name: "{{name}}"
+      name: "{{.name}}"
     spec:
       project: default
       source:
         repoURL: https://github.com/piotrjanik/kcp-poc
         targetRevision: HEAD
-        path: "{{path}}"
+        path: "{{.path}}"
         helm:
-          valuesObject: {{ .valuesObject | toYaml }}
+          values: "{{ .valuesObject | toYaml | nindent 8 }}"
       destination:
         server: https://kubernetes.default.svc
         namespace: "argocd"

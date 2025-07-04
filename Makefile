@@ -7,6 +7,7 @@ TENANT1_CLUSTER    ?= tenant1
 TENANT2_CLUSTER    ?= tenant2
 DOMAIN             ?= kcp.piotrjanik.dev
 HOSTNAME           ?= api.$(DOMAIN)
+KCP_HOSTNAME       ?= api.$(DOMAIN)
 EKS_CLUSTER_NAME   ?= kcp-cluster
 AWS_REGION         ?= eu-central-1
 EKS_NODE_TYPE      ?= t3.small
@@ -105,7 +106,9 @@ argocd-install:
 
 kcp-install:
 	@echo -e "\033[1;32m[ArgoCD] Deploying ApplicationSet\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/platform/applicationset.yaml
+	ACME_EMAIL=$(ACME_EMAIL) \
+	KCP_HOSTNAME=$(KCP_HOSTNAME) \
+	envsubst < manifests/platform/applicationset.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
 
 kcp-delete:
 	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"
