@@ -43,7 +43,7 @@ kcpUsersController:
   repoURL: "https://github.com/piotrjanik/kcp-users-controller"
   targetRevision: "HEAD"
   path: "config/default"
-  destinationNamespace: "platform"
+  destinationNamespace: "kcp"
 
 kcp:
   targetRevision: "0.10.1"
