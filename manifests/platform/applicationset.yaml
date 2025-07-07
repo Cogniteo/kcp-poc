@@ -13,7 +13,7 @@ spec:
             path: manifests/platform/middleware
             helm: false
           - name: kcp-suite
-            path: manifests/platform/kcp
+            path: manifests/platform/kcp-suite
             helm: true
             valuesObject:
               externalHostname: ${KCP_HOSTNAME}

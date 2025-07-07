@@ -1,88 +1,220 @@
-# Let's Make Infra Great Again (KCP Proof of Concept)
-This repository demonstrates KCP (Kubernetes Control Plane) and its Identity Provider (IDP) capabilities through a multi-cluster setup.
+# KCP Proof of Concept (PoC)
+
+This repository demonstrates KCP (Kubernetes Control Plane) and its multi-cluster management capabilities through a simplified infrastructure setup on AWS EKS.
+
 ## Overview
-KCP is an open-source Kubernetes Control Plane that separates the Kubernetes control plane from the data plane, allowing users to manage multiple clusters through a single API. This PoC showcases how KCP can be used to implement identity provider functionality across multiple Kubernetes clusters.
+
+KCP is an open-source project that implements a Kubernetes-like control plane focusing on multi-tenancy, workload management, and extensibility. This PoC showcases:
+
+- Multi-cluster management through a single control plane
+- Workspace-based multi-tenancy
+- GitOps deployment with ArgoCD
+- Automated infrastructure provisioning on AWS
+
 ## Architecture
-This demo uses four Kubernetes clusters:
-- **Platform Cluster**: The KCP control plane
-- **Providers Cluster**: Hosts shared services and providers
-- **Tenant Clusters** (tenant1 and tenant2): Simulates multi-tenant environments
+
+The setup consists of:
+
+- **AWS VPC**: Network infrastructure with public/private subnets
+- **AWS EKS Cluster**: Kubernetes cluster hosting KCP and other components
+- **KCP**: The control plane managing multiple logical clusters (workspaces)
+- **ArgoCD**: GitOps continuous deployment
+- **Supporting Services**: External DNS, Cert Manager, AWS Controllers for Kubernetes (ACK)
+
+## Project Structure
+
+```
+kcp-poc/
+├── Makefile                    # Simplified infrastructure management
+├── manifests/
+│   ├── eks/
+│   │   ├── vpc.yaml           # VPC CloudFormation stack
+│   │   ├── eks.yaml           # EKS CloudFormation stack
+│   │   ├── nodepool.yaml      # Karpenter node pool configuration
+│   │   ├── ingressclass.yaml  # Ingress class definition
+│   │   └── storageclass.yaml  # Storage class definition
+│   ├── kcp/
+│   │   ├── kcp-front-proxy-cert.yaml  # KCP certificate configuration
+│   │   └── users/                     # Sample user resources
+│   └── platform/
+│       ├── applicationset.yaml        # ArgoCD ApplicationSet
+│       ├── argocd-values.yaml        # ArgoCD Helm values
+│       └── kcp-suite/                # KCP Helm chart
+└── tmp/                              # Temporary files (gitignored)
+```
 
 ## Prerequisites
-- [AWS CLI](https://docs.aws.amazon.com/cli) configured with credentials and region.
+
+- [AWS CLI](https://docs.aws.amazon.com/cli) configured with appropriate credentials
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [helm](https://helm.sh/)
-- [krew](https://krew.sigs.k8s.io/)
+- [make](https://www.gnu.org/software/make/)
+- [envsubst](https://www.gnu.org/software/gettext/manual/html_node/envsubst-Invocation.html) (usually pre-installed on Linux/macOS)
+- A domain name with DNS management access
 
-## Installation & Setup
-The repository includes a Makefile to automate setup:
+## Required Environment Variables
 
-```shell
-# Bring up all infrastructure and apps (VPC, EKS, Argo CD, External DNS, KCP)
-# DOMAIN=<your-domain> make up (e.g., DOMAIN=example.com)
-DOMAIN=example.com make up
+Before running any commands, you must set these environment variables:
 
-# Tear down infrastructure (EKS, VPC)
+```bash
+export DOMAIN=your-domain.com           # Your domain for the deployment
+export ACME_EMAIL=admin@your-domain.com # Email for Let's Encrypt certificates
+```
+
+## Quick Start
+
+```bash
+# Set required environment variables
+export DOMAIN=example.com
+export ACME_EMAIL=admin@example.com
+
+# Create complete infrastructure (VPC, EKS, ArgoCD, KCP)
+make up
+
+# Access ArgoCD UI (after deployment)
+open https://argocd.$DOMAIN
+
+# Destroy all infrastructure
 make down
-
-# Clean local artifacts and Argo CD Applications
-make clean
 ```
 
-## Stack Components
-Provision or tear down components individually:
+**Note**: The initial deployment takes approximately 20-30 minutes.
 
-```shell
-# Create VPC
-make vpc-create
+## Makefile Targets
 
-# Create EKS cluster
-make eks-create
+The Makefile provides organized targets for infrastructure management:
 
-# Install/upgrade Argo CD
-make argocd-install
+### Main Workflow
 
-# Deploy applications (External DNS, Cert Manager, ACK, KCP)
-make kcp-install
-
-# Install kubectl plugins for KCP
-make kcp-setup-kubectl
-
-# Generate KCP kubeconfig
-make kcp-create-kubeconfig
+```bash
+make up     # Create complete infrastructure (VPC, EKS, ArgoCD, KCP)
+make down   # Destroy all infrastructure
 ```
 
-## Components
-The setup includes several key components:
-1. **KCP**: The central control plane (installed as part of the setup)
-2. **Cert Manager**: For certificate management
-3. **ArgoCD**: For GitOps-style deployments
-4. **External DNS**: For domain name management
-5. **ACK**: For AWS service integration
-6. **API SyncAgent**: For synchronizing resources between clusters
+### Infrastructure Management
 
-## Sample KCP Commands
-Once you have KCP up and running, here are some useful commands to interact with it:
+```bash
+make vpc-create   # Create VPC infrastructure
+make vpc-delete   # Delete VPC infrastructure
+make eks-create   # Create EKS cluster
+make eks-delete   # Delete EKS cluster
+```
 
-```shell
+### Application Deployment
+
+```bash
+make argocd-install   # Install ArgoCD
+make kcp-install      # Install KCP
+make kcp-delete       # Delete KCP
+```
+
+### KCP Setup
+
+```bash
+make kcp-setup-kubectl      # Install kubectl plugins for KCP
+make kcp-create-kubeconfig  # Generate KCP kubeconfig
+make kcp-deploy-sample      # Deploy sample KCP resources
+```
+
+### TLS Management
+
+```bash
+make controllers-create-tls-secret  # Create TLS secret for controllers
+```
+
+### Cleanup Operations
+
+```bash
+make ecr-clean  # Clean up ECR repository
+```
+
+## Configuration
+
+The following variables can be customized:
+
+- `EKS_CLUSTER_NAME`: Name of the EKS cluster (default: `kcp-cluster`)
+- `AWS_REGION`: AWS region for deployment (default: `eu-central-1`)
+- `KUBECONFIG_FILE`: Path to kubeconfig file (default: `kube.config`)
+
+## Working with KCP
+
+Once KCP is deployed, you can interact with it using kubectl:
+
+```bash
+
 # Create a workspace
-export KUBECONFIG=kcp.kubeconfig
-kubectl create workspace my-workspace
-
-# Use a workspace
-kubectl ws my-workspace
+kubectl ws create my-workspace --enter
 
 # List workspaces
-kubectl get workspace
+kubectl get workspaces
 
-# Tree of workspaces
+# View workspace tree
 kubectl ws tree
 
-# View API resources available in the workspace
-kubectl api-resources
+# Switch between workspaces
+kubectl ws use my-workspace
 
-# Create a workspace type from a file
-kubectl apply -f manifests/platform/workspace-types/dev.yaml
+# Deploy sample user resources
+make kcp-deploy-sample
+```
 
-# Create a workspace of "dev" type from a file
-kubectl apply -f manifests/platform/workspaces/tenant1.yaml
+### Sample Resources
+
+The `kcp-deploy-sample` target creates:
+- A custom resource definition for users
+- A workspace named 'users'
+- A sample user resource
+
+## Components Deployed
+
+The setup includes:
+
+1. **KCP**: Multi-tenant Kubernetes control plane
+2. **ArgoCD**: GitOps continuous deployment
+3. **Cert Manager**: Automated certificate management
+4. **External DNS**: Automatic DNS record management
+5. **AWS Controllers for Kubernetes (ACK)**: AWS service integration
+
+## Troubleshooting
+
+### Check deployment status
+
+```bash
+# Check ArgoCD applications
+kubectl get applications -n argocd
+
+# View KCP pods
+kubectl get pods -n kcp
+
+# Check certificate status
+kubectl get certificates -A
+```
+
+### View logs
+
+```bash
+# KCP logs
+kubectl logs -n kcp -l app=kcp-front-proxy
+
+# ArgoCD logs  
+kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
+```
+
+## Complete Cleanup
+
+To completely remove all resources:
+
+```bash
+# Remove all infrastructure (KCP, EKS, VPC)
+make down
+
+# The down target automatically cleans up:
+# - Temporary files in tmp/
+# - Generated kubeconfig files
+# - KCP resources
+# - EKS cluster and node groups
+# - VPC and network resources
+```
+
+**Note**: The cleanup process may take 10-15 minutes as CloudFormation stacks are deleted in the correct order.
+

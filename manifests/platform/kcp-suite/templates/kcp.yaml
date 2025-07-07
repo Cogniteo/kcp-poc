@@ -18,14 +18,14 @@ spec:
           v: {{ .Values.kcp.kcpFrontProxy.v }}
           service:
             type: {{ .Values.kcp.kcpFrontProxy.service.type | quote }}
+          ingress:
+            enabled: {{ .Values.kcp.ingress.enabled }}
+            ingressClassName: {{ .Values.kcp.ingress.ingressClassName | quote }}
+            annotations:
+              nginx.ingress.kubernetes.io/ssl-passthrough: {{ index .Values.kcp.ingress.annotations "nginx.ingress.kubernetes.io/ssl-passthrough" | quote }}
         certificateIssuer:
           name: {{ .Values.kcp.certificateIssuerName | quote }}
           kind: {{ .Values.kcp.certificateIssuerKind | quote }}
-        ingress:
-          enabled: {{ .Values.kcp.ingress.enabled }}
-          ingressClassName: {{ .Values.kcp.ingress.ingressClassName | quote }}
-          annotations:
-            nginx.ingress.kubernetes.io/ssl-passthrough: {{ index .Values.kcp.ingress.annotations "nginx.ingress.kubernetes.io/ssl-passthrough" | quote }}
         etcd:
           resources:
             requests:

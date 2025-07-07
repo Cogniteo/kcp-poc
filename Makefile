@@ -1,46 +1,128 @@
+# KCP POC Infrastructure Makefile
+# This Makefile manages the KCP infrastructure on AWS EKS
+#
+# Usage: make [target]
+# Run 'make help' for a list of available targets
+
 SHELL := /bin/bash
 
-# Default cluster names (adjust to suit your environment)
-PLATFORM_CLUSTER   ?= platform
-PROVIDERS_CLUSTER  ?= providers
-TENANT1_CLUSTER    ?= tenant1
-TENANT2_CLUSTER    ?= tenant2
-DOMAIN             ?= kcp.piotrjanik.dev
-HOSTNAME           ?= api.$(DOMAIN)
-KCP_HOSTNAME       ?= api.$(DOMAIN)
+# Required external variables (must be provided)
+ifndef DOMAIN
+$(error DOMAIN is not set. Please provide DOMAIN variable, e.g., export DOMAIN=example.com)
+endif
+ifndef ACME_EMAIL
+$(error ACME_EMAIL is not set. Please provide ACME_EMAIL variable, e.g., export ACME_EMAIL=admin@example.com)
+endif
+
+# Configuration
 EKS_CLUSTER_NAME   ?= kcp-cluster
 AWS_REGION         ?= eu-central-1
-EKS_NODE_TYPE      ?= t3.small
-# Location of your merged kubeconfig file
+
+# Derived variables
+KCP_HOSTNAME       := api.$(DOMAIN)
 KUBECONFIG_FILE    ?= kube.config
-KCPCONFIG_FILE     ?= $(KUBECONFIG_FILE)
 KREW_ROOT          ?= $(HOME)/.krew
-ARGOCD_DOMAIN      ?= argocd.$(DOMAIN)
-ACME_EMAIL         ?= admin@$(DOMAIN)
+ARGOCD_DOMAIN      := argocd.$(DOMAIN)
 
-# Variables for TLS Secret
-K8S_NAMESPACE_FOR_SECRET ?= controllers
-TLS_SECRET_NAME ?= kcp-controller-certs
-CLIENT_CERT_FILE ?= tmp/client.crt
-CLIENT_KEY_FILE ?= tmp/client.key
-CA_CERT_FILE ?= tmp/ca.crt
+# TLS Secret configuration
+K8S_NAMESPACE_FOR_SECRET := controllers
+TLS_SECRET_NAME := kcp-controller-certs
+CLIENT_CERT_FILE := tmp/client.crt
+CLIENT_KEY_FILE := tmp/client.key
+CA_CERT_FILE := tmp/ca.crt
+
+# Helper functions
+define echo_up_header
+	@echo -e "\033[1;34m=== $1 ===\033[0m"
+endef
+
+define echo_down_header
+	@echo -e "\033[1;31m=== $1 ===\033[0m"
+endef
+
+define echo_up
+	@echo -e "\033[1;32m[UP] $1\033[0m"
+endef
+
+define echo_down
+	@echo -e "\033[1;31m[DOWN] $1\033[0m"
+endef
 
 
-.PHONY: all kcp providers cli vpc-create cognito-create cognito-delete eks \
-        kcp kcp-create-cluster install-argocd-platform kcp-provision-cluster \
-        provider providers-create-cluster install-argocd-providers providers-provision-cluster providers-expose-db-api \
-        cli kcp-setup-kubectl kcp-delete clean eks-create eks-delete up down deploy-controllers \
-        create-tls-secret delete-tls-secret ecr-clean
+# Kubectl command shortcuts
+KUBECTL_EKS := kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks
+KUBECTL_KCP := kubectl --kubeconfig="$(KUBECONFIG_FILE)"
 
-all: up
 
-eks: eks-create
-kcp: kcp-create-cluster install-argocd-platform kcp-provision-cluster
-providers: providers-create-cluster install-argocd-providers providers-provision-cluster providers-expose-db-api
-cli: kcp-setup-kubectl
+.PHONY: help all up down clean \
+        vpc-create vpc-delete \
+        eks-create eks-delete \
+        kcp-setup-kubectl kcp-create-kubeconfig \
+        controllers-create-tls-secret controllers-deploy \
+        kcp-deploy-sample ecr-clean
 
+# Default target shows help
+all: help
+
+# Help target
+help:
+	@echo "KCP POC Infrastructure Management"
+	@echo ""
+	@echo "Required Environment Variables:"
+	@echo "  DOMAIN                     - Your domain (current: $(DOMAIN))"
+	@echo "  ACME_EMAIL                 - Email for ACME certificates (current: $(ACME_EMAIL))"
+	@echo ""
+	@echo "Main Workflow:"
+	@echo "  make up                    - Create complete infrastructure (VPC, EKS, ArgoCD, KCP)"
+	@echo "  make down                  - Destroy all infrastructure"
+	@echo ""
+	@echo "Infrastructure Management:"
+	@echo "  make vpc-create            - Create VPC infrastructure"
+	@echo "  make vpc-delete            - Delete VPC infrastructure"
+	@echo "  make eks-create            - Create EKS cluster"
+	@echo "  make eks-delete            - Delete EKS cluster"
+	@echo ""
+	@echo "Application Deployment:"
+	@echo "  make argocd-install        - Install ArgoCD"
+	@echo "  make kcp-install           - Install KCP"
+	@echo "  make kcp-delete            - Delete KCP"
+	@echo ""
+	@echo "KCP Setup:"
+	@echo "  make kcp-setup-kubectl     - Install kubectl plugins for KCP"
+	@echo "  make kcp-create-kubeconfig - Generate KCP kubeconfig"
+	@echo "  make kcp-deploy-sample     - Deploy sample KCP resources"
+	@echo ""
+	@echo "TLS Management:"
+	@echo "  make controllers-create-tls-secret - Create TLS secret for controllers"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  make ecr-clean             - Clean up ECR repository"
+	@echo ""
+	@echo "Configuration:"
+	@echo "  EKS_CLUSTER_NAME=$(EKS_CLUSTER_NAME)"
+	@echo "  AWS_REGION=$(AWS_REGION)"
+
+# Main workflow targets
+up:
+	$(call echo_up_header,Infrastructure setup)
+	@$(MAKE) vpc-create
+	@$(MAKE) eks-create
+	@$(MAKE) argocd-install
+	@$(MAKE) kcp-install
+	@$(MAKE) kcp-create-kubeconfig
+	$(call echo_up_header,Infrastructure setup complete)
+
+# Teardown
+down:	
+	$(call echo_down_header,Cleaning up temporary files)
+	@rm -rf tmp
+	@rm -f $(KUBECONFIG_FILE)
+	@$(MAKE) kcp-delete eks-delete vpc-delete
+	$(call echo_down_header,Infrastructure teardown complete)
+
+# VPC Management
 vpc-create:
-	@echo -e "\033[1;32m[VPC] Creating/updating via CloudFormation\033[0m"
+	$(call echo_up,Creating/updating VPC via CloudFormation)
 	@aws cloudformation deploy \
 	  --template-file manifests/eks/vpc.yaml \
 	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
@@ -49,7 +131,7 @@ vpc-create:
 	  --parameter-overrides ClusterName=$(EKS_CLUSTER_NAME)
 
 vpc-delete:
-	@echo -e "\033[1;31m[VPC] Deleting VPC resources via CloudFormation stack $(EKS_CLUSTER_NAME)-vpc\033[0m"
+	$(call echo_down,Deleting VPC resources via CloudFormation)
 	@aws cloudformation delete-stack \
 	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
 	  --region $(AWS_REGION)
@@ -58,16 +140,11 @@ vpc-delete:
 	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
 	  --region $(AWS_REGION)
 
-eks-create:		
-	@echo -e "\033[1;32m[EKS] Creating/updating cluster via CloudFormation\033[0m"
-	@echo "Checking if SpotServiceLinkedRole exists..."; \
-	if aws iam get-role --role-name AWSServiceRoleForEC2Spot >/dev/null 2>&1; then \
-	    echo "SpotServiceLinkedRole already exists. Skipping creation."; \
-	    CREATE_SPOT_ROLE=false; \
-	else \
-	    echo "SpotServiceLinkedRole not found. It will be created by CloudFormation."; \
-	    CREATE_SPOT_ROLE=true; \
-	fi; \
+# EKS Management
+eks-create:
+	$(call echo_up,Creating/updating EKS cluster via CloudFormation)
+	@echo "Checking if SpotServiceLinkedRole exists..."
+	@CREATE_SPOT_ROLE=$$(aws iam get-role --role-name AWSServiceRoleForEC2Spot >/dev/null 2>&1 && echo false || echo true); \
 	echo "Creating CloudFormation stack $(EKS_CLUSTER_NAME) with CreateSpotRole=$$CREATE_SPOT_ROLE"; \
 	aws cloudformation deploy \
 	    --template-file manifests/eks/eks.yaml \
@@ -77,14 +154,14 @@ eks-create:
 	    --parameter-overrides ClusterName=$(EKS_CLUSTER_NAME) CreateSpotRole=$$CREATE_SPOT_ROLE
 	@echo "Updating kubeconfig for cluster $(EKS_CLUSTER_NAME)"
 	@aws eks update-kubeconfig --name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --kubeconfig $(KUBECONFIG_FILE) --alias eks
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config delete-context $(EKS_CLUSTER_NAME) || true
-	@echo "Applying Karpenter NodePool manifest..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/eks/nodepool.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/eks/ingressclass.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f manifests/eks/storageclass.yaml
+	@$(KUBECTL_EKS) config delete-context $(EKS_CLUSTER_NAME) || true
+	@echo "Applying cluster manifests..."
+	@$(KUBECTL_EKS) apply -f manifests/eks/nodepool.yaml
+	@$(KUBECTL_EKS) apply -f manifests/eks/ingressclass.yaml
+	@$(KUBECTL_EKS) apply -f manifests/eks/storageclass.yaml
 
 eks-delete: ecr-clean
-	@echo -e "\033[1;31m[EKS] Deleting EKS cluster via CloudFormation stack $(EKS_CLUSTER_NAME)\033[0m"
+	$(call echo_down,Deleting EKS cluster via CloudFormation)
 	@aws cloudformation delete-stack \
 	  --stack-name $(EKS_CLUSTER_NAME) \
 	  --region $(AWS_REGION)
@@ -94,7 +171,7 @@ eks-delete: ecr-clean
 	  --region $(AWS_REGION)
 
 argocd-install:
-	@echo -e "\033[1;32m[Argo CD] Installing/upgrading release\033[0m"; \
+	$(call echo_up,Installing ArgoCD)
 	helm repo add argo https://argoproj.github.io/argo-helm || true; \
 	helm repo update; \
 	helm upgrade --install argocd argo/argo-cd --version 8.0.3 \
@@ -105,141 +182,83 @@ argocd-install:
 	  --values manifests/platform/argocd-values.yaml
 
 kcp-install:
-	@echo -e "\033[1;32m[ArgoCD] Deploying ApplicationSet\033[0m"
+	$(call echo_up,Installing KCP)
 	ACME_EMAIL=$(ACME_EMAIL) \
 	KCP_HOSTNAME=$(KCP_HOSTNAME) \
-	envsubst < manifests/platform/applicationset.yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
+	envsubst < manifests/platform/applicationset.yaml | $(KUBECTL_EKS) apply -f -
 
 kcp-delete:
-	@echo -e "\033[1;31m[KCP] Deleting custom resources...\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete clusterissuer selfsigned-cluster-issuer --ignore-not-found || true
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete userpool kcp-userpool --ignore-not-found || true
+	$(call echo_down,Deleting KCP)
+	@$(KUBECTL_EKS) delete clusterissuer selfsigned-cluster-issuer --ignore-not-found || true
+	@$(KUBECTL_EKS) delete userpool kcp-userpool --ignore-not-found || true
 
+
+# KCP Setup
 kcp-setup-kubectl:
-	@echo -e "\033[1;32m[Kubectl plugin setup] Krew and KCP plugins\033[0m"
-	@if command -v kubectl-krew > /dev/null 2>&1; then \
-	  echo -e "\033[1;32m[Krew] Krew is already installed. Skipping...\033[0m"; \
-	else \
-	  echo -e "\033[1;32m[Krew] Installing Krew using Homebrew...\033[0m"; \
+	$(call echo_up,Installing Krew and KCP plugins)
+	@if ! command -v kubectl-krew > /dev/null 2>&1; then \
+	  echo "Installing Krew using Homebrew..."; \
 	  brew install krew; \
-	  echo -e "\033[1;32m[Krew] Krew installation complete. If needed, add $$HOME/.krew/bin to your PATH.\033[0m"; \
 	fi
-	@echo -e "\033[1;32m[Krew] Installing kcp plugins (kcp, ws, create-workspace) using Krew...\033[0m"
+	@echo "Installing kcp plugins using Krew..."
 	@kubectl krew index add kcp-dev https://github.com/kcp-dev/krew-index.git || true
-	@kubectl krew install kcp-dev/kcp
-	@kubectl krew install kcp-dev/ws
-	@kubectl krew install kcp-dev/create-workspace
-	@cp ${KREW_ROOT}/bin/kubectl-create_workspace ${KREW_ROOT}/bin/kubectl-create-workspace
+	@kubectl krew install kcp-dev/kcp kcp-dev/ws kcp-dev/create-workspace
+	@cp ${KREW_ROOT}/bin/kubectl-create_workspace ${KREW_ROOT}/bin/kubectl-create-workspace || true
 
 kcp-create-kubeconfig:
-	@echo -e "\033[1;32m[KCP] Generating KCP kubeconfig\033[0m"
-	@echo "Creating tmp directory if necessary..."
+	$(call echo_up,Generating KCP kubeconfig)
 	@mkdir -p tmp
-	@echo "Applying client certificate manifest to the platform cluster..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp apply -f manifests/kcp/cert.yaml
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp wait certificate.cert-manager.io --for=condition=ready cluster-admin-client-cert
-	echo "Extracting the KCP front proxy certificate to tmp/ca.crt..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp get secret kcp-front-proxy-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/ca.crt
-	@echo "Extracting client certificate and key from secret..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/client.crt
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.key}' | base64 -d > tmp/client.key
+	$(KUBECTL_EKS) -n kcp wait certificate.cert-manager.io --for=condition=ready cluster-admin-client-cert
+	$(KUBECTL_EKS) -n kcp get secret kcp-front-proxy-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/ca.crt
+	$(KUBECTL_EKS) -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/client.crt
+	$(KUBECTL_EKS) -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.key}' | base64 -d > tmp/client.key
 	@chmod 600 tmp/client.crt tmp/client.key
+	$(KUBECTL_KCP) config set-cluster base --server https://$(KCP_HOSTNAME):443 --certificate-authority=tmp/ca.crt
+	$(KUBECTL_KCP) config set-cluster root --server https://$(KCP_HOSTNAME):443/clusters/root --certificate-authority=tmp/ca.crt
+	$(KUBECTL_KCP) config set-credentials kcp-admin --client-certificate=tmp/client.crt --client-key=tmp/client.key
+	$(KUBECTL_KCP) config set-context kcp-base --cluster=base --user=kcp-admin
+	$(KUBECTL_KCP) config set-context kcp-root --cluster=root --user=kcp-admin
+	$(KUBECTL_KCP) config use-context kcp-root
 
-	echo "Configuring 'base' cluster in kcp.kubeconfig..."
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster base --server https://$(HOSTNAME):443 --certificate-authority=tmp/ca.crt
-	echo "Configuring 'root' cluster in kcp.kubeconfig..."
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster root --server https://$(HOSTNAME):443/clusters/root --certificate-authority=tmp/ca.crt
-	@echo "Setting kcp-admin credentials in kcp.kubeconfig..."
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-credentials kcp-admin --client-certificate=tmp/client.crt --client-key=tmp/client.key
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-base --cluster=base --user=kcp-admin
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context kcp-root --cluster=root --user=kcp-admin
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config use-context kcp-root
-
+# Controllers Management
 controllers-create-tls-secret:
-	@echo -e "\033[1;32m[TLS Secret] Creating/updating TLS secret $(TLS_SECRET_NAME) in namespace $(K8S_NAMESPACE_FOR_SECRET) using context eks\033[0m"
-	@if [ ! -f "$(CLIENT_CERT_FILE)" ]; then \
-		echo -e "\033[1;31m[TLS Secret] Error: Client certificate file $(CLIENT_CERT_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded.\033[0m"; \
-		exit 1; \
-	fi
-	@if [ ! -f "$(CLIENT_KEY_FILE)" ]; then \
-		echo -e "\033[1;31m[TLS Secret] Error: Client key file $(CLIENT_KEY_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded.\033[0m"; \
-		exit 1; \
-	fi
-	@if [ ! -f "$(CA_CERT_FILE)" ]; then \
-		echo -e "\033[1;31m[TLS Secret] Error: CA certificate file $(CA_CERT_FILE) not found. Ensure 'make kcp-create-kubeconfig' succeeded.\033[0m"; \
-		exit 1; \
-	fi
+	$(call echo_up,Creating/updating TLS secret)
+	@for file in $(CLIENT_CERT_FILE) $(CLIENT_KEY_FILE) $(CA_CERT_FILE); do \
+		if [ ! -f "$$file" ]; then \
+			$(call echo_error,Error: $$file not found. Run 'make kcp-create-kubeconfig' first); \
+			exit 1; \
+		fi; \
+	done
 	@echo "Creating/Updating secret $(TLS_SECRET_NAME)..."
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks create secret generic $(TLS_SECRET_NAME) \
+	@$(KUBECTL_EKS) create secret generic $(TLS_SECRET_NAME) \
 		--from-file=tls.crt=$(CLIENT_CERT_FILE) \
 		--from-file=tls.key=$(CLIENT_KEY_FILE) \
 		--from-file=ca.crt=$(CA_CERT_FILE) \
 		--namespace=$(K8S_NAMESPACE_FOR_SECRET) \
-		--dry-run=client -o yaml | kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks apply -f -
-
-controllers-delete-tls-secret:
-	@echo -e "\033[1;31m[TLS Secret] Deleting TLS secret $(TLS_SECRET_NAME) from namespace $(K8S_NAMESPACE_FOR_SECRET) using context eks\033[0m"
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" --context eks delete secret $(TLS_SECRET_NAME) \
-		--namespace=$(K8S_NAMESPACE_FOR_SECRET) --ignore-not-found=true
-
-controllers-deploy:
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" config use-context eks
-	@kubectl --kubeconfig="$(KUBECONFIG_FILE)" create namespace controllers || true
-	@$(MAKE) controllers-create-tls-secret
-	@IMG=ghcr.io/piotrjanik/kcp-users-controller:latest && \
-	@echo "Deploying kcp-users-controller using GHCR image $${IMG}" && \
-	@$(MAKE) -C ../kcp-users-controller deploy IMG=$${IMG} KUBECTL="kubectl --kubeconfig=$(CURDIR)/$(KUBECONFIG_FILE)"
+		--dry-run=client -o yaml | $(KUBECTL_EKS) apply -f -
 
 kcp-deploy-sample:
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.yaml
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context kcp-root apply -f manifests/kcp/users/workspace.yaml
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-cluster users --server https://$(HOSTNAME):443/clusters/root:users --certificate-authority=tmp/ca.crt
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" config set-context users --cluster=users --user=kcp-admin
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context users create namespace default || true
-	@kubectl --kubeconfig="$(KCPCONFIG_FILE)" --context users apply -n default -f manifests/kcp/users/sample-user.yml
-	
-clean:
-	@echo -e "\033[1;32m[Clean] Deleting Argo CD applications...\033[0m"
-	@kubectl --kubeconfig=$(KUBECONFIG_FILE) -n argocd delete applications --all || true
-	@echo -e "\033[1;32m[Clean] Deleting EKS CF stack...\033[0m"
-	@$(MAKE) eks-delete
-	@echo -e "\033[1;32m[Clean] Deleting VPC CF stack...\033[0m"
-	@$(MAKE) vpc-delete
-	@echo -e "\033[1;32m[Clean] Cleaning up temporary files...\033[0m"
-	@rm -rf tmp
-	@rm -f $(KUBECONFIG_FILE)
-	@rm -f $(KCPCONFIG_FILE)
-	@echo -e "\033[1;32m[Clean] Complete\033[0m"
-
-.PHONY: up down
-
-up:
-	@$(MAKE) vpc-create
-	@$(MAKE) eks-create
-	@$(MAKE) argocd-install
-	@$(MAKE) kcp-install
-	@$(MAKE) kcp-setup-kubectl
-	@$(MAKE) kcp-create-kubeconfig
-
-down:
-	@echo -e "\033[1;31m[DOWN] Deleting EKS cluster\033[0m"
-	@$(MAKE) eks-delete
-	@echo -e "\033[1;31m[DOWN] Deleting VPC resources\033[0m"
-	@$(MAKE) vpc-delete
+	$(call echo_up,Deploying sample resources)
+	@$(KUBECTL_KCP) --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.yaml
+	@$(KUBECTL_KCP) --context kcp-root apply -f manifests/kcp/users/workspace.yaml
+	@$(KUBECTL_KCP) config set-cluster users --server https://$(HOSTNAME):443/clusters/root:users --certificate-authority=tmp/ca.crt
+	@$(KUBECTL_KCP) config set-context users --cluster=users --user=kcp-admin
+	@$(KUBECTL_KCP) --context users create namespace default || true
+	@$(KUBECTL_KCP) --context users apply -n default -f manifests/kcp/users/sample-user.yml
 
 ecr-clean:
-	@echo -e "\033[1;33m[ECR] Cleaning Controllers ECR repository\033[0m"
-	@ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text) && \
+	$(call echo_down,Cleaning Controllers ECR repository)
+	@ECR_URI=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME) --region $(AWS_REGION) --query "Stacks[0].Outputs[?OutputKey=='ControllersRepositoryUri'].OutputValue" --output text 2>/dev/null) && \
 	if [ -z "$$ECR_URI" ]; then \
-	  echo -e "\033[1;33m[ECR] No ControllersRepositoryUri found. Skipping ECR cleanup.\033[0m"; \
+	  echo "No ControllersRepositoryUri found. Skipping ECR cleanup."; \
 	else \
 	  REPO=$$(echo $$ECR_URI | cut -d/ -f2-); \
-	  COUNT=$$(aws ecr list-images --repository-name $$REPO --region $(AWS_REGION) --query 'length(imageIds)' --output text); \
+	  COUNT=$$(aws ecr list-images --repository-name $$REPO --region $(AWS_REGION) --query 'length(imageIds)' --output text 2>/dev/null || echo 0); \
 	  if [ "$$COUNT" -gt 0 ]; then \
 	    IDS=$$(aws ecr list-images --repository-name $$REPO --region $(AWS_REGION) --query 'imageIds[*]' --output json); \
 	    aws ecr batch-delete-image --repository-name $$REPO --region $(AWS_REGION) --image-ids "$$IDS"; \
-	    echo -e "\033[1;33m[ECR] Deleted $$COUNT images from $$REPO.\033[0m"; \
+	    echo "Deleted $$COUNT images from $$REPO."; \
 	  else \
-	    echo -e "\033[1;33m[ECR] ECR repo $$REPO is already empty.\033[0m"; \
+	    echo "ECR repo $$REPO is already empty."; \
 	  fi; \
 	fi
