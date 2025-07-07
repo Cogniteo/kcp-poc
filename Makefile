@@ -115,9 +115,9 @@ up:
 # Teardown
 down:	
 	$(call echo_down_header,Cleaning up temporary files)
-	@rm -rf tmp
-	@rm -f $(KUBECONFIG_FILE)
 	@$(MAKE) kcp-delete eks-delete vpc-delete
+	@rm -f $(KUBECONFIG_FILE)
+	@rm -rf tmp
 	$(call echo_down_header,Infrastructure teardown complete)
 
 # VPC Management
@@ -191,6 +191,7 @@ kcp-delete:
 	$(call echo_down,Deleting KCP)
 	@$(KUBECTL_EKS) delete clusterissuer selfsigned-cluster-issuer --ignore-not-found || true
 	@$(KUBECTL_EKS) delete userpool kcp-userpool --ignore-not-found || true
+	@$(KUBECTL_EKS) -n argocd delete applicationset kcp-suite --ignore-not-found || true
 
 
 # KCP Setup
