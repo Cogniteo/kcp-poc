@@ -11,16 +11,18 @@ spec:
         elements:
           - name: middleware
             path: manifests/platform/middleware
-            valuesObject: {}
+            helm: false
           - name: kcp
             path: manifests/platform/kcp
+            helm: true
             valuesObject:
               externalHostname: ${KCP_HOSTNAME}
           - name: cognito
             path: manifests/core/cognito
-            valuesObject: {}
+            helm: false
           - name: certificates
             path: manifests/platform/certificates
+            helm: true
             valuesObject:
               letsencrypt:
                 email: ${ACME_EMAIL}
@@ -33,8 +35,6 @@ spec:
         repoURL: https://github.com/piotrjanik/kcp-poc
         targetRevision: HEAD
         path: "{{.path}}"
-        helm:
-          values: "{{ .valuesObject | toYaml | nindent 8 }}"
       destination:
         server: https://kubernetes.default.svc
         namespace: "argocd"
@@ -44,3 +44,11 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+  templatePatch: |
+    {{- if .helm }}
+    spec:
+      source:
+        helm:
+          valuesObject:
+            {{ .valuesObject | toYaml | nindent 20 }}
+    {{- end }}
