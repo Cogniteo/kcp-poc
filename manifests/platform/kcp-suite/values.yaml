@@ -39,12 +39,6 @@ ingressNginx:
         service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
         service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
 
-kcpUsersController:
-  repoURL: "https://github.com/piotrjanik/kcp-users-controller"
-  targetRevision: "HEAD"
-  path: "config/default"
-  destinationNamespace: "kcp"
-
 kcp:
   targetRevision: "0.10.1"
   externalHostname: "api.kcp.piotrjanik.dev"
@@ -69,4 +63,4 @@ controllers:
     repoURL: "https://github.com/piotrjanik/kcp-users-controller"
     targetRevision: "HEAD"
     path: "config/default"
-    destinationNamespace: "platform"
+    destinationNamespace: "kcp"

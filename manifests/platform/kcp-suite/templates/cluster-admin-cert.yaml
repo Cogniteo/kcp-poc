@@ -2,7 +2,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: cluster-admin-client-cert
-  namespace: {{ .destinationNamespace | quote }}
+  namespace: kcp
 spec:
   commonName: cluster-admin
   issuerRef:
