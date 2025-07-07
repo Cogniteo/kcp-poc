@@ -11,6 +11,8 @@ spec:
     repoURL: {{ .repoURL | quote }}
     targetRevision: {{ .targetRevision | quote }}
     path: {{ .path | quote }}
+    kustomize:
+      namespace: {{ .destinationNamespace | quote }}
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ .destinationNamespace | quote }}
