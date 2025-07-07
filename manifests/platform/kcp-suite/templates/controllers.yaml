@@ -21,5 +21,22 @@ spec:
     syncOptions:
       - CreateNamespace=true
 ---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .name }}-client-cert
+spec:
+  commonName: cluster-admin
+  issuerRef:
+    name: kcp-front-proxy-client-issuer
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  secretName: {{ .name }}-client-cert
+  subject:
+    organizations:
+      - system:kcp:admin
+  usages:
+    - client auth
 {{- end }}
 
