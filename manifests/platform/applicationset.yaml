@@ -12,7 +12,7 @@ spec:
           - name: middleware
             path: manifests/platform/middleware
             helm: false
-          - name: kcp
+          - name: kcp-suite
             path: manifests/platform/kcp
             helm: true
             valuesObject:
