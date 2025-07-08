@@ -245,7 +245,7 @@ kcp-deploy-sample:
 	$(call echo_up,Deploying sample resources)
 	@$(KUBECTL_KCP) --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.yaml
 	@$(KUBECTL_KCP) --context kcp-root apply -f manifests/kcp/users/workspace.yaml
-	@$(KUBECTL_KCP) config set-cluster users --server https://$(HOSTNAME):443/clusters/root:users --certificate-authority=tmp/ca.crt
+	@$(KUBECTL_KCP) config set-cluster users --server https://$(KCP_HOSTNAME):443/clusters/root:users --certificate-authority=tmp/ca.crt
 	@$(KUBECTL_KCP) config set-context users --cluster=users --user=kcp-admin
 	@$(KUBECTL_KCP) --context users create namespace default || true
 	@$(KUBECTL_KCP) --context users apply -n default -f manifests/kcp/users/sample-user.yml
