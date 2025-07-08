@@ -209,6 +209,9 @@ kcp-setup-kubectl:
 kcp-create-kubeconfig:
 	$(call echo_up,Generating KCP kubeconfig)
 	@mkdir -p tmp
+	$(KUBECTL_EKS) wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io certificates.cert-manager.io
+	$(KUBECTL_EKS) wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
+	$(KUBECTL_EKS) wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
 	$(KUBECTL_EKS) -n kcp wait certificate.cert-manager.io --for=condition=ready cluster-admin-client-cert
 	$(KUBECTL_EKS) -n kcp get secret kcp-front-proxy-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/ca.crt
 	$(KUBECTL_EKS) -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/client.crt
