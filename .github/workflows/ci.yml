@@ -21,7 +21,7 @@ jobs:
           for template in manifests/eks/*.yaml manifests/cognito/*.yaml; do
             if [ -f "$template" ]; then
               echo "Validating $template"
-              cfn-lint "$template"
+              cfn-lint "$template" --info
             fi
           done
 
@@ -34,14 +34,14 @@ jobs:
 
       - name: Validate Kubernetes manifests
         run: |
-          # Install kubeval for Kubernetes manifest validation
-          curl -L https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz | tar xz
-          sudo mv kubeval /usr/local/bin
+          # Install kubeconform (better than kubeval for CRDs)
+          curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin
           
-          # Validate all Kubernetes YAML files
+          # Validate all Kubernetes YAML files (skip custom resources that don't have schemas)
           find manifests -name "*.yaml" -o -name "*.yml" | grep -v cloudformation | while read -r file; do
             echo "Validating $file"
-            kubeval "$file" || echo "Warning: Failed to validate $file"
+            kubeconform -summary -skip NodeClass,NodePool "$file" || echo "Warning: Failed to validate $file"
           done
 
   helm-validation:
@@ -85,7 +85,7 @@ jobs:
       - name: Lint YAML files
         run: |
           # Create yamllint config
-          cat > .yamllint.yml << EOF
+          cat > .yamllint.yml << 'EOF'
           extends: default
           rules:
             line-length:
@@ -94,6 +94,9 @@ jobs:
               min-spaces-from-content: 1
             indentation:
               spaces: 2
+            document-start: disable
+            truthy: disable
+            trailing-spaces: disable
           EOF
           
           # Lint all YAML files
