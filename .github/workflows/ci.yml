@@ -1,0 +1,121 @@
+name: Infrastructure CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  cloudformation-validation:
+    name: CloudFormation Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Install CloudFormation Linter
+        run: pip install cfn-lint
+
+      - name: Validate CloudFormation templates
+        run: |
+          echo "Validating CloudFormation templates with cfn-lint..."
+          for template in manifests/eks/*.yaml manifests/cognito/*.yaml; do
+            if [ -f "$template" ]; then
+              echo "Validating $template"
+              cfn-lint "$template"
+            fi
+          done
+
+  kubernetes-validation:
+    name: Kubernetes Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Validate Kubernetes manifests
+        run: |
+          # Install kubeval for Kubernetes manifest validation
+          curl -L https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz | tar xz
+          sudo mv kubeval /usr/local/bin
+          
+          # Validate all Kubernetes YAML files
+          find manifests -name "*.yaml" -o -name "*.yml" | grep -v cloudformation | while read -r file; do
+            echo "Validating $file"
+            kubeval "$file" || echo "Warning: Failed to validate $file"
+          done
+
+  helm-validation:
+    name: Helm Chart Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: '3.12.0'
+
+      - name: Validate Helm values files
+        run: |
+          # Check if there are any Helm charts to validate
+          if find . -name "values.yaml" -o -name "values.yml" | grep -q .; then
+            echo "Found Helm values files to validate"
+            find . -name "values.yaml" -o -name "values.yml" | while read -r file; do
+              echo "Validating $file"
+              helm lint "$(dirname "$file")" --values "$file" || echo "Warning: Failed to lint $file"
+            done
+          else
+            echo "No Helm charts found to validate"
+          fi
+
+  yaml-lint:
+    name: YAML Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Install yamllint and yq
+        run: |
+          pip install yamllint
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Lint YAML files
+        run: |
+          # Create yamllint config
+          cat > .yamllint.yml << EOF
+          extends: default
+          rules:
+            line-length:
+              max: 120
+            comments:
+              min-spaces-from-content: 1
+            indentation:
+              spaces: 2
+          EOF
+          
+          # Lint all YAML files
+          find . -name "*.yaml" -o -name "*.yml" | xargs yamllint -c .yamllint.yml
+
+      - name: Validate YAML syntax
+        run: |
+          # Validate all YAML files for syntax
+          find . -name "*.yaml" -o -name "*.yml" | while read -r file; do
+            echo "Checking YAML syntax: $file"
+            yq eval '.' "$file" > /dev/null || echo "Warning: Invalid YAML syntax in $file"
+          done
+
+  makefile-validation:
+    name: Makefile Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Check Makefile syntax
+        run: |
+          if [ -f "Makefile" ]; then
+            make -n help > /dev/null || echo "Warning: Makefile syntax issues detected"
+          fi
