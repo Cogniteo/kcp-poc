@@ -84,23 +84,8 @@ jobs:
 
       - name: Lint YAML files
         run: |
-          # Create yamllint config
-          cat > .yamllint.yml << 'EOF'
-          extends: default
-          rules:
-            line-length:
-              max: 120
-            comments:
-              min-spaces-from-content: 1
-            indentation:
-              spaces: 2
-            document-start: disable
-            truthy: disable
-            trailing-spaces: disable
-          EOF
-          
-          # Lint all YAML files
-          find . -name "*.yaml" -o -name "*.yml" | xargs yamllint -c .yamllint.yml
+          # Lint all YAML files (exclude Helm templates)
+          find . -name "*.yaml" -o -name "*.yml" | grep -v "/templates/" | xargs yamllint
 
       - name: Validate YAML syntax
         run: |
