@@ -17,9 +17,6 @@ spec:
             helm: true
             valuesObject:
               externalHostname: ${KCP_HOSTNAME}
-          - name: cognito
-            path: manifests/core/cognito
-            helm: false
           - name: certificates
             path: manifests/platform/certificates
             helm: true

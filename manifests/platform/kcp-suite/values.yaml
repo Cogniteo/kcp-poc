@@ -61,6 +61,6 @@ kcp:
 controllers:
   - name: kcp-users-controller
     repoURL: "https://github.com/piotrjanik/kcp-users-controller"
-    targetRevision: "HEAD"
+    targetRevision: "v0.1.1"
     path: "config/default"
     destinationNamespace: "kcp"

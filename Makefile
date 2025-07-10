@@ -57,9 +57,10 @@ KUBECTL_KCP := kubectl --kubeconfig="$(KUBECONFIG_FILE)"
 .PHONY: help all up down clean \
         vpc-create vpc-delete \
         eks-create eks-delete \
+        cognito-create cognito-delete \
         kcp-setup-kubectl kcp-create-kubeconfig \
         controllers-create-tls-secret controllers-deploy \
-        kcp-deploy-sample ecr-clean
+        kcp-deploy-sample ecr-clean apply-admin-user
 
 # Default target shows help
 all: help
@@ -81,6 +82,8 @@ help:
 	@echo "  make vpc-delete            - Delete VPC infrastructure"
 	@echo "  make eks-create            - Create EKS cluster"
 	@echo "  make eks-delete            - Delete EKS cluster"
+	@echo "  make cognito-create        - Create Cognito resources"
+	@echo "  make cognito-delete        - Delete Cognito resources"
 	@echo ""
 	@echo "Application Deployment:"
 	@echo "  make argocd-install        - Install ArgoCD"
@@ -107,6 +110,7 @@ up:
 	$(call echo_up_header,Infrastructure setup)
 	@$(MAKE) vpc-create
 	@$(MAKE) eks-create
+	@$(MAKE) cognito-create
 	@$(MAKE) argocd-install
 	@$(MAKE) kcp-install
 	@$(MAKE) kcp-create-kubeconfig
@@ -115,7 +119,7 @@ up:
 # Teardown
 down:	
 	$(call echo_down_header,Cleaning up temporary files)
-	@$(MAKE) kcp-delete eks-delete vpc-delete
+	@$(MAKE) kcp-delete eks-delete cognito-delete vpc-delete
 	@rm -f $(KUBECONFIG_FILE)
 	@rm -rf tmp
 	$(call echo_down_header,Infrastructure teardown complete)
@@ -138,6 +142,29 @@ vpc-delete:
 	@echo "Waiting for VPC CF stack deletion to complete..."
 	@aws cloudformation wait stack-delete-complete \
 	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
+	  --region $(AWS_REGION)
+
+# Cognito Management
+cognito-create:
+	$(call echo_up,Creating/updating Cognito resources via CloudFormation)
+	@aws cloudformation deploy \
+	  --template-file manifests/cognito/stack.yaml \
+	  --stack-name $(EKS_CLUSTER_NAME)-cognito \
+	  --region $(AWS_REGION) \
+	  --capabilities CAPABILITY_IAM \
+	  --parameter-overrides \
+	    ClusterName=$(EKS_CLUSTER_NAME) \
+	    DomainName=$(DOMAIN) \
+	    CallbackUrl=https://api.$(DOMAIN)/auth/callback
+
+cognito-delete:
+	$(call echo_down,Deleting Cognito resources via CloudFormation)
+	@aws cloudformation delete-stack \
+	  --stack-name $(EKS_CLUSTER_NAME)-cognito \
+	  --region $(AWS_REGION)
+	@echo "Waiting for Cognito CF stack deletion to complete..."
+	@aws cloudformation wait stack-delete-complete \
+	  --stack-name $(EKS_CLUSTER_NAME)-cognito \
 	  --region $(AWS_REGION)
 
 # EKS Management
@@ -186,11 +213,33 @@ kcp-install:
 	ACME_EMAIL=$(ACME_EMAIL) \
 	KCP_HOSTNAME=$(KCP_HOSTNAME) \
 	envsubst < manifests/platform/applicationset.yaml | $(KUBECTL_EKS) apply -f -
+	
+	$(call echo_up,Creating OIDC secret for Cognito integration)
+	@USER_POOL_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text) && \
+	CLIENT_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text) && \
+	CLIENT_SECRET=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientSecret'].OutputValue" --output text) && \
+	OIDC_URL="https://cognito-idp.$(AWS_REGION).amazonaws.com/$$USER_POOL_ID" && \
+	$(KUBECTL_EKS) create namespace kcp --dry-run=client -o yaml | $(KUBECTL_EKS) apply -f - && \
+	$(KUBECTL_EKS) create secret generic oidc-secret \
+	  --namespace=kcp \
+	  --from-literal=url=$$OIDC_URL \
+	  --from-literal=client_id=$$CLIENT_ID \
+	  --from-literal=client_secret=$$CLIENT_SECRET \
+	  --dry-run=client -o yaml | $(KUBECTL_EKS) apply -f -
+	
+	$(call echo_up,Waiting for KCP ArgoCD Application to become healthy)
+	$(call echo_up,Waiting for KCP application to be created and become healthy)
+	$(KUBECTL_EKS) -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced --timeout=300s application.argoproj.io/kcp
+	$(KUBECTL_EKS) -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=600s application.argoproj.io/kcp
 
 kcp-delete:
 	$(call echo_down,Deleting KCP)
 	@$(KUBECTL_EKS) delete clusterissuer selfsigned-cluster-issuer --ignore-not-found || true
 	@$(KUBECTL_EKS) delete userpool kcp-userpool --ignore-not-found || true
+	@echo "Note: Cognito resources are now managed via CloudFormation"
 	@$(KUBECTL_EKS) -n argocd delete applicationset kcp-suite --ignore-not-found || true
 
 
@@ -212,6 +261,7 @@ kcp-create-kubeconfig:
 	$(KUBECTL_EKS) wait --for=create --timeout=480s customresourcedefinitions.apiextensions.k8s.io certificates.cert-manager.io
 	$(KUBECTL_EKS) wait --for=create --timeout=120s -n cert-manager deployment cert-manager-webhook
 	$(KUBECTL_EKS) wait --for=condition=Available --timeout=120s -n cert-manager deployment/cert-manager-webhook
+	$(call echo_up,Waiting for cluster admin certificate to be ready)
 	$(KUBECTL_EKS) -n kcp wait certificate.cert-manager.io --for=condition=ready cluster-admin-client-cert
 	$(KUBECTL_EKS) -n kcp get secret kcp-front-proxy-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/ca.crt
 	$(KUBECTL_EKS) -n kcp get secret cluster-admin-client-cert -o=jsonpath='{.data.tls\.crt}' | base64 -d > tmp/client.crt

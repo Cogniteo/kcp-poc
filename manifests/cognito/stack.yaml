@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for Cognito UserPool and Client App'
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: kcp-cluster
+    Description: Name of the EKS cluster
+    
+  DomainName:
+    Type: String
+    Default: example.com
+    Description: Domain name for the application
+    
+  CallbackUrl:
+    Type: String
+    Default: https://api.example.com/auth/callback
+    Description: Callback URL for the client app
+
+Resources:
+  KcpUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: kcp-user-pool
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireUppercase: true
+      UserPoolAddOns:
+        AdvancedSecurityMode: "OFF"
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: true
+          AttributeDataType: String
+          
+  KcpUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub 'id-${ClusterName}'
+      UserPoolId: !Ref KcpUserPool
+      
+  KcpUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref KcpUserPool
+      ClientName: kcp-app-client
+      GenerateSecret: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      CallbackURLs:
+        - !Ref CallbackUrl
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      SupportedIdentityProviders:
+        - COGNITO
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+
+Outputs:
+  UserPoolId:
+    Description: ID of the Cognito User Pool
+    Value: !Ref KcpUserPool
+    Export:
+      Name: !Sub '${ClusterName}-UserPoolId'
+  UserPoolArn:
+    Description: ARN of the Cognito User Pool
+    Value: !GetAtt KcpUserPool.Arn
+    Export:
+      Name: !Sub '${ClusterName}-UserPoolArn'
+  UserPoolClientId:
+    Description: ID of the Cognito User Pool Client
+    Value: !Ref KcpUserPoolClient
+    Export:
+      Name: !Sub '${ClusterName}-UserPoolClientId'
+  UserPoolClientSecret:
+    Description: Client secret of the Cognito User Pool Client
+    Value: !GetAtt KcpUserPoolClient.ClientSecret
+    Export:
+      Name: !Sub '${ClusterName}-UserPoolClientSecret'
