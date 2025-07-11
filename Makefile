@@ -154,7 +154,6 @@ cognito-create:
 	  --capabilities CAPABILITY_IAM \
 	  --parameter-overrides \
 	    ClusterName=$(EKS_CLUSTER_NAME) \
-	    DomainName=$(DOMAIN) \
 	    CallbackUrl=https://api.$(DOMAIN)/auth/callback
 
 cognito-delete:
