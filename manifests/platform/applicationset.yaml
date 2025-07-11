@@ -29,7 +29,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/piotrjanik/kcp-poc
+        repoURL: https://github.com/Cogniteo/kcp-poc
         targetRevision: HEAD
         path: "{{.path}}"
       destination:

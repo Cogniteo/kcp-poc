@@ -7,11 +7,6 @@ Parameters:
     Default: kcp-cluster
     Description: Name of the EKS cluster
     
-  DomainName:
-    Type: String
-    Default: example.com
-    Description: Domain name for the application
-    
   CallbackUrl:
     Type: String
     Default: https://api.example.com/auth/callback
