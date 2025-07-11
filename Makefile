@@ -128,7 +128,7 @@ down:
 vpc-create:
 	$(call echo_up,Creating/updating VPC via CloudFormation)
 	@aws cloudformation deploy \
-	  --template-file manifests/eks/vpc.yaml \
+	  --template-file manifests/eks/cf-vpc.yaml \
 	  --stack-name $(EKS_CLUSTER_NAME)-vpc \
 	  --region $(AWS_REGION) \
 	  --capabilities CAPABILITY_IAM \
@@ -148,7 +148,7 @@ vpc-delete:
 cognito-create:
 	$(call echo_up,Creating/updating Cognito resources via CloudFormation)
 	@aws cloudformation deploy \
-	  --template-file manifests/cognito/stack.yaml \
+	  --template-file manifests/cognito/cf-stack.yaml \
 	  --stack-name $(EKS_CLUSTER_NAME)-cognito \
 	  --region $(AWS_REGION) \
 	  --capabilities CAPABILITY_IAM \
@@ -174,7 +174,7 @@ eks-create:
 	@CREATE_SPOT_ROLE=$$(aws iam get-role --role-name AWSServiceRoleForEC2Spot >/dev/null 2>&1 && echo false || echo true); \
 	echo "Creating CloudFormation stack $(EKS_CLUSTER_NAME) with CreateSpotRole=$$CREATE_SPOT_ROLE"; \
 	aws cloudformation deploy \
-	    --template-file manifests/eks/eks.yaml \
+	    --template-file manifests/eks/cf-eks.yaml \
 	    --stack-name $(EKS_CLUSTER_NAME) \
 	    --region $(AWS_REGION) \
 	    --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \

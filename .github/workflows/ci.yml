@@ -18,11 +18,9 @@ jobs:
       - name: Validate CloudFormation templates
         run: |
           echo "Validating CloudFormation templates with cfn-lint..."
-          for template in manifests/eks/*.yaml manifests/cognito/*.yaml; do
-            if [ -f "$template" ]; then
-              echo "Validating $template"
-              cfn-lint "$template" --info
-            fi
+          find . -name "cf-*.yaml" -o -name "cf-*.yml" | while read -r template; do
+            echo "Validating $template"
+            cfn-lint "$template" --info
           done
 
   kubernetes-validation:
