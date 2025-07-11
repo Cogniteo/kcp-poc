@@ -22,7 +22,7 @@ metadata:
   name: users
 spec:
   latestResourceSchemas:
-    - v1alpha1.users.kcp.piotrjanik.dev
+    - v1alpha1.users.kcp.cogniteo.io
   permissionClaims:
     - all: true
       resource: secrets

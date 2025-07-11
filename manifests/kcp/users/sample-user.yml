@@ -1,8 +1,7 @@
-apiVersion: kcp.piotrjanik.dev/v1alpha1
+apiVersion: kcp.cogniteo.io/v1alpha1
 kind: User
 metadata:
   labels:
     app.kubernetes.io/name: users
-    app.kubernetes.io/managed-by: kustomize
   name: user-sample
 spec:
