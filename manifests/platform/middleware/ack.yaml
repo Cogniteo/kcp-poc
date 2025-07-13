@@ -21,6 +21,10 @@ spec:
           enabled: true
           aws:
             region: eu-central-1
+        iam:
+          enabled: true
+          aws:
+            region: eu-central-1
   destination:
     server: https://kubernetes.default.svc
     namespace: ack-system

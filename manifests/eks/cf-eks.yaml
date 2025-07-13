@@ -331,6 +331,40 @@ Resources:
       RoleArn: !GetAtt AckCognitoControllerRole.Arn
     DependsOn:
       - ControlPlane
+
+  AckIamControllerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ClusterName}-ack-iam-controller-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - pods.eks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+      Policies:
+        - PolicyName: ack-iam-controller-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:*
+                Resource: "*"
+
+  AckIamControllerPodIdentityAssociation:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      Namespace: ack-system
+      ServiceAccount: ack-iam-controller
+      RoleArn: !GetAtt AckIamControllerRole.Arn
+    DependsOn:
+      - ControlPlane
   
   BackstageRole:
     Type: AWS::IAM::Role
@@ -375,6 +409,11 @@ Outputs:
     Value: !GetAtt AckControllerRole.Arn
     Export:
       Name: !Sub "${ClusterName}-ackcontroller-role-arn"
+  AckIamControllerRoleArn:
+    Description: "ARN of the IAM role for ACK IAM Controller"
+    Value: !GetAtt AckIamControllerRole.Arn
+    Export:
+      Name: !Sub "${ClusterName}-ackiamcontroller-role-arn"
   BackstageRoleArn:
     Description: "ARN of the IAM role for Backstage"
     Value: !GetAtt BackstageRole.Arn
