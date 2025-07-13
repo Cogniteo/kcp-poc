@@ -21,7 +21,7 @@ spec:
           enabled: true
           aws:
             region: eu-central-1
-        eck:
+        eks:
           enabled: true
           aws:
             region: eu-central-1
