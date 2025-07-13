@@ -70,6 +70,8 @@ Resources:
         IdToken: minutes
         RefreshToken: days
 
+
+
 Outputs:
   UserPoolId:
     Description: ID of the Cognito User Pool
@@ -91,3 +93,4 @@ Outputs:
     Value: !GetAtt KcpUserPoolClient.ClientSecret
     Export:
       Name: !Sub '${ClusterName}-UserPoolClientSecret'
+

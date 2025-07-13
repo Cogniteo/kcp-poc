@@ -59,8 +59,12 @@ kcp:
   volumeClassName: "standard"
   auditEnabled: false
 controllers:
-  - name: kcp-users-controller
+  - name: users
     repoURL: "https://github.com/Cogniteo/kcp-users-controller"
     targetRevision: "v0.*"
     path: "config/default"
     destinationNamespace: "kcp"
+    serviceAccountName: "users-controller"
+    roleName: "users-controller-role"
+    managedPolicies:
+      - "arn:aws:iam::aws:policy/AmazonCognitoPowerUser"

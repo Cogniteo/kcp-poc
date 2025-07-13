@@ -29,7 +29,7 @@ metadata:
   name: {{ .name }}-client-cert
   namespace: {{ .destinationNamespace | quote }} 
 spec:
-  commonName: cluster-admin
+  commonName: {{ .name }}-cert
   issuerRef:
     name: kcp-front-proxy-client-issuer
   privateKey:
@@ -41,5 +41,46 @@ spec:
       - system:kcp:admin
   usages:
     - client auth
+{{- if .managedPolicies }}
+---
+apiVersion: eks.aws.amazon.com/v1alpha1
+kind: IAMRole
+metadata:
+  name: {{ .name }}
+spec:
+  assumeRolePolicyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "pods.eks.amazonaws.com"
+          },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+  description: "IAM Role for the {{ .name }} controller"
+  managedPolicies:
+    {{- range .managedPolicies }}
+    - {{ . }}
+    {{- end }}
+  tags:
+    - key: Name
+      value: "{{ .name }}"
+    - key: Controller
+      value: {{ .name | quote }}
+---
+apiVersion: eks.amazonaws.com/v1alpha1
+kind: PodIdentityAssociation
+metadata:
+  name: {{ .name }}
+  namespace: {{ .destinationNamespace | quote }}
+spec:
+  serviceAccountName: {{ .serviceAccountName | default (printf "%s-controller" .name) | quote }}
+  roleRef:
+    name: {{ .name }}
+    kind: IAMRole
 {{- end }}
-
+{{- end }}
