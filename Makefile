@@ -231,8 +231,8 @@ kcp-install:
 	
 	$(call echo_up,Waiting for KCP ArgoCD Application to become healthy)
 	$(call echo_up,Waiting for KCP application to be created and become healthy)
-	$(KUBECTL_EKS) -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced --timeout=300s application.argoproj.io/kcp
-	$(KUBECTL_EKS) -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=600s application.argoproj.io/kcp
+	$(KUBECTL_EKS) -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced --timeout=300s application.argoproj.io/kcp-suite
+	$(KUBECTL_EKS) -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy --timeout=600s application.argoproj.io/kcp-suite
 
 kcp-delete:
 	$(call echo_down,Deleting KCP)
