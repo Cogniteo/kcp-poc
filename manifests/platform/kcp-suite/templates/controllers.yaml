@@ -13,6 +13,15 @@ spec:
     path: {{ .path | quote }}
     kustomize:
       namespace: {{ .destinationNamespace | quote }}
+      patches:
+        - target:
+            kind: Deployment
+            name: controller-manager
+            namespace: system
+          patch: |-
+            - op: replace
+              path: /spec/template/spec/volumes/0/secret/secretName
+              value: {{ .name }}-client-cert
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ .destinationNamespace | quote }}
@@ -29,7 +38,7 @@ metadata:
   name: {{ .name }}-client-cert
   namespace: {{ .destinationNamespace | quote }} 
 spec:
-  commonName: {{ .name }}-cert
+  commonName: {{ .name }}
   issuerRef:
     name: kcp-front-proxy-client-issuer
   privateKey:
