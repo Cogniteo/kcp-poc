@@ -72,15 +72,16 @@ spec:
     - key: Controller
       value: {{ .name | quote }}
 ---
-apiVersion: eks.amazonaws.com/v1alpha1
+apiVersion: eks.services.k8s.aws/v1alpha1
 kind: PodIdentityAssociation
 metadata:
   name: {{ .name }}
   namespace: {{ .destinationNamespace | quote }}
 spec:
-  serviceAccountName: {{ .serviceAccountName | default (printf "%s-controller" .name) | quote }}
+  namespace: {{ .destinationNamespace | quote }}
+  serviceAccount: {{ .serviceAccountName | default (printf "%s-controller" .name) | quote }}
   roleRef:
-    name: {{ .name }}
-    kind: IAMRole
+    from:
+      name: {{ .name }}
 {{- end }}
 {{- end }}

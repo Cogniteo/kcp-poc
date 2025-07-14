@@ -59,7 +59,7 @@ kcp:
   volumeClassName: "standard"
   auditEnabled: false
 controllers:
-  - name: users
+  - name: users-controller
     repoURL: "https://github.com/Cogniteo/kcp-users-controller"
     targetRevision: "v0.*"
     path: "config/default"

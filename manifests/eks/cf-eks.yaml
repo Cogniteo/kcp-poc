@@ -366,6 +366,41 @@ Resources:
     DependsOn:
       - ControlPlane
   
+  # IAM IRSA role and association for ACK EKS Controller
+  AckEksControllerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ClusterName}-ack-eks-controller-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - pods.eks.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+      Policies:
+        - PolicyName: ack-eks-controller-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - eks:*
+                Resource: "*"
+
+  AckEksControllerPodIdentityAssociation:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      Namespace: ack-system
+      ServiceAccount: ack-eks-controller
+      RoleArn: !GetAtt AckEksControllerRole.Arn
+    DependsOn:
+      - ControlPlane
+  
   BackstageRole:
     Type: AWS::IAM::Role
     Properties:
