@@ -48,6 +48,7 @@ kind: Role
 metadata:
   name: {{ .name }}
 spec:
+  name: {{ .name }}
   assumeRolePolicyDocument: |
     {
       "Version": "2012-10-17",
