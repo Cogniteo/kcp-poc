@@ -62,7 +62,7 @@ controllers:
   - name: kcp-users-controller
     repoURL: "ghcr.io/cogniteo"
     chart: kcp-users-controller
-    targetRevision: "v0.*"
+    targetRevision: "*"
     destinationNamespace: "kcp"
     serviceAccountName: "users-controller"
     managedPolicies:
