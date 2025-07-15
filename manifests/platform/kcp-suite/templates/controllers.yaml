@@ -17,11 +17,15 @@ spec:
           serviceAccountName: {{ .serviceAccountName | quote }}
           container:
             args:
-              - "--cognito-user-pool-id={{ .cognitoUserPoolID }}"
+              - "--cognito-user-pool-id={{ default .cognitoUserPoolID .cognitoUserPoolName }}"
               - "--virtual-workspace-url={{ .virtualWorkspaceUrl }}"
               - "--client-cert=/etc/secrets/client-cert/tls.crt"
               - "--client-key=/etc/secrets/client-cert/tls.key"
               - "--ca-cert=/etc/secrets/client-cert/ca.crt"
+            {{- if .envs }}
+            env: 
+              {{- include "common.tplvalues.render" (dict "value" .envs "context" $) | nindent 14 }}
+            {{- end }}
           extraSecrets:
             - name: client-cert
               secretName: {{ .name }}-client-cert

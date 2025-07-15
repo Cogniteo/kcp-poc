@@ -18,6 +18,7 @@ spec:
             valuesObject:
               clusterName: ${CLUSTER_NAME}
               externalHostname: ${KCP_HOSTNAME}
+              cognitoUserPoolId: ${COGNITO_USER_POOL_ID}
           - name: certificates
             path: manifests/platform/certificates
             helm: true

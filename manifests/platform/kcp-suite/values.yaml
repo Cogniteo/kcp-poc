@@ -62,11 +62,14 @@ controllers:
   - name: kcp-users-controller
     repoURL: "ghcr.io/cogniteo"
     chart: kcp-users-controller
-    targetRevision: "v0.2.1"
+    targetRevision: "v0.3.0"
     destinationNamespace: "kcp"
     serviceAccountName: "users-controller"
     managedPolicies:
       - "arn:aws:iam::aws:policy/AmazonCognitoPowerUser"
-    cognitoUserPoolID: "eu-central-1_123456789"
-    virtualWorkspaceUrl: "https://api.kcp.piotrjanik.dev:443/services/apiexport/root/users"
-    
+    virtualWorkspaceUrl: "https://{{ $.Values.externalHostname }}:443/services/apiexport/root/users"
+    envs:
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: COGNITO_USER_POOL_ID
+        value: "{{ $.Values.cognitoUserPoolId }}"

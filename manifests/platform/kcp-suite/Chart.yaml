@@ -4,3 +4,8 @@ description: Helm chart for ArgoCD Application definitions
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
+
+dependencies:
+  - name: common
+    repository: https://charts.bitnami.com/bitnami
+    version: 2.x.x
