@@ -60,7 +60,7 @@ kcp:
   auditEnabled: false
 controllers:
   - name: users-controller
-    repoURL: "oci://ghcr.io/cogniteo/"
+    repoURL: "ghcr.io/cogniteo"
     chart: kcp-users-controller
     targetRevision: "v0.*"
     destinationNamespace: "kcp"
