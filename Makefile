@@ -209,9 +209,12 @@ argocd-install:
 
 kcp-install:
 	$(call echo_up,Installing KCP)
+	@USER_POOL_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text) && \
 	ACME_EMAIL=$(ACME_EMAIL) \
 	KCP_HOSTNAME=$(KCP_HOSTNAME) \
 	CLUSTER_NAME=$(EKS_CLUSTER_NAME) \
+	COGNITO_USER_POOL_ID=$$USER_POOL_ID \
 	envsubst < manifests/platform/applicationset.yaml | $(KUBECTL_EKS) apply -f -
 	
 	$(call echo_up,Creating OIDC secret for Cognito integration)
