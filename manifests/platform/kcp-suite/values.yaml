@@ -60,11 +60,13 @@ kcp:
   auditEnabled: false
 controllers:
   - name: users-controller
-    repoURL: "https://github.com/Cogniteo/kcp-users-controller"
+    repoURL: "oci://ghcr.io/cogniteo/"
+    chart: kcp-users-controller
     targetRevision: "v0.*"
-    path: "config/default"
     destinationNamespace: "kcp"
     serviceAccountName: "users-controller"
-    roleName: "users-controller-role"
     managedPolicies:
       - "arn:aws:iam::aws:policy/AmazonCognitoPowerUser"
+    cognitoUserPoolID: "eu-central-1_123456789"
+    virtualWorkspaceUrl: "https://api.kcp.piotrjanik.dev:443/services/apiexport/root/users"
+    

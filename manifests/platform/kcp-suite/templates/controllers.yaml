@@ -9,19 +9,23 @@ spec:
   project: default
   source:
     repoURL: {{ .repoURL | quote }}
+    chart: {{ .chart | quote }}
     targetRevision: {{ .targetRevision | quote }}
-    path: {{ .path | quote }}
-    kustomize:
-      namespace: {{ .destinationNamespace | quote }}
-      patches:
-        - target:
-            kind: Deployment
-            name: controller-manager
-            namespace: system
-          patch: |-
-            - op: replace
-              path: /spec/template/spec/volumes/0/secret/secretName
-              value: {{ .name }}-client-cert
+    helm: 
+      valuesObject:
+        controllerManager:
+          serviceAccountName: {{ .serviceAccountName | quote }}
+          args:
+            - "--cognito-user-pool-id={{ .cognitoUserPoolID }}"
+            - "--virtual-workspace-url={{ .virtualWorkspaceUrl }}"
+            - "--client-cert=/etc/secrets/client-cert/tls.crt"
+            - "--client-key=/etc/secrets/client-cert/tls.key"
+            - "--ca-cert=/etc/secrets/client-cert/ca.crt"
+          extraSecrets:
+            - name: client-cert
+              secretName: {{ .name }}-client-cert
+              mountPath: /etc/secrets/client-cert
+              readOnly: true
   destination:
     server: https://kubernetes.default.svc
     namespace: {{ .destinationNamespace | quote }}
