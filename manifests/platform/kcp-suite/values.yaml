@@ -59,10 +59,10 @@ kcp:
   volumeClassName: "standard"
   auditEnabled: false
 controllers:
-  - name: users-controller
+  - name: kcp-users-controller
     repoURL: "ghcr.io/cogniteo"
     chart: kcp-users-controller
-    targetRevision: "v0.2.0"
+    targetRevision: "v0.*"
     destinationNamespace: "kcp"
     serviceAccountName: "users-controller"
     managedPolicies:
