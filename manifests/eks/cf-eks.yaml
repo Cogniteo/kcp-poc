@@ -390,6 +390,11 @@ Resources:
                 Action:
                   - eks:*
                 Resource: "*"
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                  - iam:Get*
+                Resource: "*"
 
   AckEksControllerPodIdentityAssociation:
     Type: AWS::EKS::PodIdentityAssociation
