@@ -211,6 +211,7 @@ kcp-install:
 	$(call echo_up,Installing KCP)
 	ACME_EMAIL=$(ACME_EMAIL) \
 	KCP_HOSTNAME=$(KCP_HOSTNAME) \
+	CLUSTER_NAME=$(EKS_CLUSTER_NAME) \
 	envsubst < manifests/platform/applicationset.yaml | $(KUBECTL_EKS) apply -f -
 	
 	$(call echo_up,Creating OIDC secret for Cognito integration)

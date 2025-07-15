@@ -95,6 +95,7 @@ metadata:
   namespace: {{ .destinationNamespace | quote }}
 spec:
   namespace: {{ .destinationNamespace | quote }}
+  clusterName: {{ .clusterName | quote }}
   serviceAccount: {{ .serviceAccountName | default (printf "%s-controller" .name) | quote }}
   roleRef:
     from:

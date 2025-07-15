@@ -16,6 +16,7 @@ spec:
             path: manifests/platform/kcp-suite
             helm: true
             valuesObject:
+              clusterName: ${CLUSTER_NAME}
               externalHostname: ${KCP_HOSTNAME}
           - name: certificates
             path: manifests/platform/certificates
