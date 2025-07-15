@@ -15,12 +15,13 @@ spec:
       valuesObject:
         controllerManager:
           serviceAccountName: {{ .serviceAccountName | quote }}
-          args:
-            - "--cognito-user-pool-id={{ .cognitoUserPoolID }}"
-            - "--virtual-workspace-url={{ .virtualWorkspaceUrl }}"
-            - "--client-cert=/etc/secrets/client-cert/tls.crt"
-            - "--client-key=/etc/secrets/client-cert/tls.key"
-            - "--ca-cert=/etc/secrets/client-cert/ca.crt"
+          container:
+            args:
+              - "--cognito-user-pool-id={{ .cognitoUserPoolID }}"
+              - "--virtual-workspace-url={{ .virtualWorkspaceUrl }}"
+              - "--client-cert=/etc/secrets/client-cert/tls.crt"
+              - "--client-key=/etc/secrets/client-cert/tls.key"
+              - "--ca-cert=/etc/secrets/client-cert/ca.crt"
           extraSecrets:
             - name: client-cert
               secretName: {{ .name }}-client-cert
