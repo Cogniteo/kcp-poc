@@ -232,7 +232,12 @@ kcp-install:
 	  --from-literal=client_id=$$CLIENT_ID \
 	  --from-literal=client_secret=$$CLIENT_SECRET \
 	  --dry-run=client -o yaml | $(KUBECTL_EKS) apply -f -
-	
+	$(call echo_up,Waiting for application to be created)
+	@echo "Waiting for kcp-suite application to be created..."; \
+	until $(KUBECTL_EKS) -n argocd get application kcp-suite >/dev/null 2>&1; do \
+	  echo "Waiting for kcp-suite application to be created..."; \
+	  sleep 5; \
+	done
 	$(call echo_up,Waiting for KCP ArgoCD Application to become healthy)
 	$(call echo_up,Waiting for KCP application to be created and become healthy)
 	$(KUBECTL_EKS) -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced --timeout=300s application.argoproj.io/kcp-suite
