@@ -16,6 +16,8 @@ spec:
         controllerManager:
           serviceAccountName: {{ .serviceAccountName | quote }}
           container:
+            image:
+              tag: {{ .targetRevision | quote }}
             args:
               - "--client-cert=/etc/secrets/client-cert/tls.crt"
               - "--client-key=/etc/secrets/client-cert/tls.key"
