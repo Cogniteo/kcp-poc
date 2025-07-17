@@ -60,14 +60,13 @@ kcp:
   auditEnabled: false
 controllers:
   - name: kcp-users-controller
-    repoURL: "ghcr.io/cogniteo"
+    repoURL: "ghcr.io/cogniteo/helm-charts"
     chart: kcp-users-controller
-    targetRevision: "v0.3.3"
+    targetRevision: "v0.3.4"
     destinationNamespace: "kcp"
     serviceAccountName: "users-controller"
     managedPolicies:
       - "arn:aws:iam::aws:policy/AmazonCognitoPowerUser"
-    virtualWorkspaceUrl: 
     envs:
       LOG_LEVEL: debug
       COGNITO_USER_POOL_ID: "{{ $.Values.cognitoUserPoolId }}"

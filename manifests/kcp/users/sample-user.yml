@@ -5,3 +5,4 @@ metadata:
     app.kubernetes.io/name: users
   name: user-sample
 spec:
+  email: "user-sample@example.com"
