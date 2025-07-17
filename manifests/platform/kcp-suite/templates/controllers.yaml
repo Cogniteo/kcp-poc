@@ -67,8 +67,11 @@ metadata:
   name: {{ .name }}
   namespace: {{ .destinationNamespace | quote }}
   annotations:
-    services.k8s.aws/adoption-policy: "adopt-by-id"
-    services.k8s.aws/adoption-fields: "name,metadata.name"
+    services.k8s.aws/adoption-policy: "adopt"
+    services.k8s.aws/adoption-fields: | 
+      {
+        "name": "{{ .name }}"
+      }
 spec:
   name: {{ .name }}
   assumeRolePolicyDocument: |
