@@ -29,6 +29,9 @@ spec:
           enabled: true
           aws:
             region: eu-central-1
+          featureGates:
+            ResourceAdoption: true
+
   destination:
     server: https://kubernetes.default.svc
     namespace: ack-system
