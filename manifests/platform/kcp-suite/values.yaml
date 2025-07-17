@@ -62,7 +62,7 @@ controllers:
   - name: kcp-users-controller
     repoURL: "ghcr.io/cogniteo/helm-charts"
     chart: kcp-users-controller
-    targetRevision: "v0.3.4"
+    targetRevision: "v0.*"
     destinationNamespace: "kcp"
     serviceAccountName: "users-controller"
     managedPolicies:
@@ -71,4 +71,12 @@ controllers:
       LOG_LEVEL: debug
       COGNITO_USER_POOL_ID: "{{ $.Values.cognitoUserPoolId }}"
       VIRTUAL_WORKSPACE_URL: "https://{{ $.Values.externalHostname }}:443/services/apiexport/root/users"
-        
+  - name: kcp-mcp-server
+    repoURL: "ghcr.io/cogniteo/helm-charts"
+    chart: kcp-mcp-server
+    targetRevision: "v0.*"
+    destinationNamespace: "kcp"
+    serviceAccountName: "mcp-server"
+    envs:
+      LOG_LEVEL: debug
+      KCP_BASE_URL: "https://{{ $.Values.externalHostname }}"
