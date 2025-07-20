@@ -62,7 +62,7 @@ controllers:
   - name: kcp-users-controller
     repoURL: "ghcr.io/cogniteo/helm-charts"
     chart: kcp-users-controller
-    targetRevision: "0.*"
+    targetRevision: "v0.*"
     destinationNamespace: "kcp"
     serviceAccountName: "users-controller"
     managedPolicies:
