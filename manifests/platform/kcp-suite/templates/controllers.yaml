@@ -16,6 +16,9 @@ spec:
         controllerManager:
           serviceAccountName: {{ .serviceAccountName | quote }}
           container:
+            readinessProbe:
+              initialDelaySeconds: 15
+              periodSeconds: 20
             args:
               - "--client-cert=/etc/secrets/client-cert/tls.crt"
               - "--client-key=/etc/secrets/client-cert/tls.key"
