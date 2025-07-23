@@ -18,14 +18,10 @@ spec:
           container:
             readinessProbe:
               failureThreshold: 30
-              httpGet:
-                path: /readyz
-                port: 8081
-                scheme: HTTP
-              initialDelaySeconds: 15
-              periodSeconds: 20
-              successThreshold: 1
-              timeoutSeconds: 1
+              initialDelaySeconds: 30
+            livenessProbe:
+              failureThreshold: 30
+              initialDelaySeconds: 30
             args:
               - "--client-cert=/etc/secrets/client-cert/tls.crt"
               - "--client-key=/etc/secrets/client-cert/tls.key"
