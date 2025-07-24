@@ -117,5 +117,6 @@ spec:
   roleRef:
     from:
       name: {{ .name }}
+---
 {{- end }}
 {{- end }}
