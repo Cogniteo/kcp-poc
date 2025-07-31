@@ -318,6 +318,8 @@ kcp-example-create-users:
 	@echo "Creating team-c workspace..."
 	@$(KUBECTL_KCP) --context kcp-root apply -f examples/team-c/workspace.yaml	
 	@sleep 2
+
+
 	@echo "Entering team-a workspace..."
 	@kubectl ws :root:team-a
 	@echo "Creating APIBinding for users API in team-a workspace..."
@@ -326,7 +328,6 @@ kcp-example-create-users:
 	@echo "Creating alice user in team-a workspace..."
 	@kubectl apply -f examples/team-a/user.yaml
 
-	@sleep 2
 	@echo "Entering team-b workspace..."
 	@kubectl ws :root:team-b
 	@echo "Creating APIBinding for users API in team-b workspace..."
@@ -334,7 +335,7 @@ kcp-example-create-users:
 	@sleep 3
 	@echo "Creating bob user in team-b workspace..."
 	@kubectl apply -f examples/team-b/user.yaml
-	@sleep 2
+
 	@echo "Entering team-c workspace..."
 	@kubectl ws :root:team-c
 	@echo "Creating APIBinding for users API in team-c workspace..."
