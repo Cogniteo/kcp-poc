@@ -26,6 +26,23 @@ The setup consists of:
 ```
 kcp-poc/
 ├── Makefile                    # Simplified infrastructure management
+├── examples/                   # KCP example resources
+│   ├── users.schema.yaml       # User API resource schema
+│   ├── users.apiexport.yaml    # User API export definition
+│   ├── workspaces.yaml         # Team workspaces (legacy)
+│   ├── users.yaml              # Team users (legacy)
+│   ├── team-a/                 # Team A workspace resources
+│   │   ├── workspace.yaml      # Workspace definition
+│   │   ├── apibinding.yaml     # APIBinding for users API
+│   │   └── user.yaml           # Alice user
+│   ├── team-b/                 # Team B workspace resources
+│   │   ├── workspace.yaml      # Workspace definition
+│   │   ├── apibinding.yaml     # APIBinding for users API
+│   │   └── user.yaml           # Bob user
+│   └── team-c/                 # Team C workspace resources
+│       ├── workspace.yaml      # Workspace definition
+│       ├── apibinding.yaml     # APIBinding for users API
+│       └── user.yaml           # Carol user
 ├── manifests/
 │   ├── eks/
 │   │   ├── vpc.yaml           # VPC CloudFormation stack
@@ -113,7 +130,14 @@ make kcp-delete       # Delete KCP
 ```bash
 make kcp-setup-kubectl      # Install kubectl plugins for KCP
 make kcp-create-kubeconfig  # Generate KCP kubeconfig
-make kcp-deploy-sample      # Deploy sample KCP resources
+```
+
+### KCP Examples
+
+```bash
+make kcp-example-export-users-api  # Export users API schema and APIExport
+make kcp-example-create-users       # Create team workspaces with users
+make kcp-example-clean-up           # Clean up example team workspaces
 ```
 
 ### TLS Management
@@ -153,17 +177,61 @@ kubectl ws tree
 
 # Switch between workspaces
 kubectl ws use my-workspace
-
-# Deploy sample user resources
-make kcp-deploy-sample
 ```
 
-### Sample Resources
+## KCP Examples
 
-The `kcp-deploy-sample` target creates:
-- A custom resource definition for users
-- A workspace named 'users'
-- A sample user resource
+The `examples/` directory contains practical demonstrations of KCP's multi-workspace capabilities:
+
+### User Management Example
+
+This example demonstrates how to create a shared user management service across multiple team workspaces:
+
+1. **Export Users API** - Creates and exports a custom User resource schema
+2. **Create Team Workspaces** - Sets up three team workspaces (team-a, team-b, team-c)
+3. **Bind and Use API** - Each team binds to the users API and creates their own users
+
+#### Running the Example
+
+```bash
+# Step 1: Export the users API schema and make it available
+make kcp-example-export-users-api
+
+# Step 2: Create team workspaces and users
+make kcp-example-create-users
+
+# Step 3: Clean up when done
+make kcp-example-clean-up
+```
+
+#### What Gets Created
+
+**API Export (Root Workspace)**:
+- `APIResourceSchema`: Defines the User custom resource structure
+- `APIExport`: Makes the users API available to other workspaces
+
+**Team Workspaces**:
+- `team-a`: Workspace with alice user (alice@cogniteo.io)
+- `team-b`: Workspace with bob user (bob@cogniteo.io)  
+- `team-c`: Workspace with carol user (carol@cogniteo.io)
+
+**Per-Workspace Resources**:
+- `APIBinding`: Binds the workspace to the users API export
+- `User`: Team-specific user resource
+
+#### Exploring the Results
+
+```bash
+# View workspace tree
+kubectl ws tree
+
+# Switch to a team workspace and view users
+kubectl ws :root:team-a
+kubectl get users
+
+# View user details
+kubectl get user alice -o yaml
+```
 
 ## Components Deployed
 
@@ -188,16 +256,6 @@ kubectl get pods -n kcp
 
 # Check certificate status
 kubectl get certificates -A
-```
-
-### View logs
-
-```bash
-# KCP logs
-kubectl logs -n kcp -l app=kcp-front-proxy
-
-# ArgoCD logs  
-kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 ```
 
 ## Complete Cleanup

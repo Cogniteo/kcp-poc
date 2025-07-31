@@ -1,8 +1,0 @@
-apiVersion: kcp.cogniteo.io/v1alpha1
-kind: User
-metadata:
-  labels:
-    app.kubernetes.io/name: users
-  name: user-sample
-spec:
-  email: "user-sample@example.com"

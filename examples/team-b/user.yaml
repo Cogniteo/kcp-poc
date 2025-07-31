@@ -1,0 +1,7 @@
+apiVersion: kcp.cogniteo.io/v1alpha1
+kind: User
+metadata:
+  name: bob
+  namespace: default
+spec:
+  email: bob@cogniteo.io

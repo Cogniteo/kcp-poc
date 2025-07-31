@@ -1,0 +1,9 @@
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIBinding
+metadata:
+  name: users
+spec:
+  reference:
+    export:
+      path: root
+      name: users

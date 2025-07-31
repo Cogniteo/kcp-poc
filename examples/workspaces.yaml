@@ -1,0 +1,26 @@
+apiVersion: tenancy.kcp.io/v1alpha1
+kind: Workspace
+metadata:
+  name: team-a
+spec:
+  type:
+    name: universal
+    path: root
+---
+apiVersion: tenancy.kcp.io/v1alpha1
+kind: Workspace
+metadata:
+  name: team-b
+spec:
+  type:
+    name: universal
+    path: root
+---
+apiVersion: tenancy.kcp.io/v1alpha1
+kind: Workspace
+metadata:
+  name: team-c
+spec:
+  type:
+    name: universal
+    path: root

@@ -60,7 +60,7 @@ KUBECTL_KCP := kubectl --kubeconfig="$(KUBECONFIG_FILE)"
         cognito-create cognito-delete \
         kcp-setup-kubectl kcp-create-kubeconfig \
         controllers-create-tls-secret controllers-deploy \
-        kcp-deploy-sample ecr-clean apply-admin-user
+        kcp-example-export-users-api kcp-example-create-users kcp-example-clean-up ecr-clean apply-admin-user
 
 # Default target shows help
 all: help
@@ -93,7 +93,11 @@ help:
 	@echo "KCP Setup:"
 	@echo "  make kcp-setup-kubectl     - Install kubectl plugins for KCP"
 	@echo "  make kcp-create-kubeconfig - Generate KCP kubeconfig"
-	@echo "  make kcp-deploy-sample     - Deploy sample KCP resources"
+	@echo ""
+	@echo "KCP Examples:"
+	@echo "  make kcp-example-export-users-api - Export users API schema and APIExport"
+	@echo "  make kcp-example-create-users      - Create team workspaces with users"
+	@echo "  make kcp-example-clean-up          - Clean up example team workspaces"
 	@echo ""
 	@echo "TLS Management:"
 	@echo "  make controllers-create-tls-secret - Create TLS secret for controllers"
@@ -299,14 +303,58 @@ controllers-create-tls-secret:
 		--namespace=$(K8S_NAMESPACE_FOR_SECRET) \
 		--dry-run=client -o yaml | $(KUBECTL_EKS) apply -f -
 
-kcp-deploy-sample:
-	$(call echo_up,Deploying sample resources)
-	@$(KUBECTL_KCP) --context kcp-root apply -f manifests/kcp/users/v1alpha1.users.yaml
-	@$(KUBECTL_KCP) --context kcp-root apply -f manifests/kcp/users/workspace.yaml
-	@$(KUBECTL_KCP) config set-cluster users --server https://$(KCP_HOSTNAME):443/clusters/root:users --certificate-authority=tmp/ca.crt
-	@$(KUBECTL_KCP) config set-context users --cluster=users --user=kcp-admin
-	@$(KUBECTL_KCP) --context users create namespace default || true
-	@$(KUBECTL_KCP) --context users apply -n default -f manifests/kcp/users/sample-user.yml
+kcp-example-export-users-api:
+	$(call echo_up,Exporting users API schema and APIExport)
+	@$(KUBECTL_KCP) --context kcp-root apply -f examples/users.schema.yaml
+	@$(KUBECTL_KCP) --context kcp-root apply -f examples/users.apiexport.yaml
+	$(call echo_up,Users API exported successfully)
+
+kcp-example-create-users:
+	$(call echo_up,Creating team workspaces and users)
+	@echo "Creating team-a workspace..."
+	@$(KUBECTL_KCP) --context kcp-root apply -f examples/team-a/workspace.yaml
+	@echo "Creating team-b workspace..."
+	@$(KUBECTL_KCP) --context kcp-root apply -f examples/team-b/workspace.yaml
+	@echo "Creating team-c workspace..."
+	@$(KUBECTL_KCP) --context kcp-root apply -f examples/team-c/workspace.yaml	
+	@sleep 2
+	@echo "Entering team-a workspace..."
+	@kubectl ws :root:team-a
+	@echo "Creating APIBinding for users API in team-a workspace..."
+	@kubectl apply -f examples/team-a/apibinding.yaml
+	@sleep 3
+	@echo "Creating alice user in team-a workspace..."
+	@kubectl apply -f examples/team-a/user.yaml
+
+	@sleep 2
+	@echo "Entering team-b workspace..."
+	@kubectl ws :root:team-b
+	@echo "Creating APIBinding for users API in team-b workspace..."
+	@kubectl apply -f examples/team-b/apibinding.yaml
+	@sleep 3
+	@echo "Creating bob user in team-b workspace..."
+	@kubectl apply -f examples/team-b/user.yaml
+	@sleep 2
+	@echo "Entering team-c workspace..."
+	@kubectl ws :root:team-c
+	@echo "Creating APIBinding for users API in team-c workspace..."
+	@kubectl apply -f examples/team-c/apibinding.yaml
+	@sleep 3
+	@echo "Creating carol user in team-c workspace..."
+	@kubectl apply -f examples/team-c/user.yaml
+	$(call echo_up,All team workspaces and users created successfully)
+
+kcp-example-clean-up:
+	$(call echo_down,Cleaning up example team workspaces)
+	@echo "Switching to root context..."
+	@$(KUBECTL_KCP) config use-context kcp-root
+	@echo "Deleting team-a workspace..."
+	@$(KUBECTL_KCP) delete workspace team-a --ignore-not-found
+	@echo "Deleting team-b workspace..."
+	@$(KUBECTL_KCP) delete workspace team-b --ignore-not-found
+	@echo "Deleting team-c workspace..."
+	@$(KUBECTL_KCP) delete workspace team-c --ignore-not-found
+	$(call echo_down,Example team workspaces cleaned up successfully)
 
 ecr-clean:
 	$(call echo_down,Cleaning Controllers ECR repository)

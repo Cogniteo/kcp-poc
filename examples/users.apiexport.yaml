@@ -1,0 +1,10 @@
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIExport
+metadata:
+  name: users
+spec:
+  latestResourceSchemas:
+    - v1alpha1.users.kcp.cogniteo.io
+  permissionClaims:
+    - all: true
+      resource: secrets

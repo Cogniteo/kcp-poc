@@ -1,0 +1,23 @@
+apiVersion: kcp.cogniteo.io/v1alpha1
+kind: User
+metadata:
+  name: alice
+  namespace: default
+spec:
+  email: alice@cogniteo.io
+---
+apiVersion: kcp.cogniteo.io/v1alpha1
+kind: User
+metadata:
+  name: bob
+  namespace: default
+spec:
+  email: bob@cogniteo.io
+---
+apiVersion: kcp.cogniteo.io/v1alpha1
+kind: User
+metadata:
+  name: carol
+  namespace: default
+spec:
+  email: carol@cogniteo.io
