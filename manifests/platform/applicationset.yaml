@@ -17,9 +17,9 @@ spec:
             helm: true
             valuesObject:
               clusterName: ${CLUSTER_NAME}
-              externalHostname: ${KCP_HOSTNAME}
               cognitoUserPoolId: ${COGNITO_USER_POOL_ID}
               kcp:
+                externalHostname: ${KCP_HOSTNAME}
                 oidc:
                   enabled: true
                   clientId: ${COGNITO_CLIENT_ID}
