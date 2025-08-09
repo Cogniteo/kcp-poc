@@ -58,6 +58,7 @@ kcp:
   v: 9
   volumeClassName: "standard"
   auditEnabled: false
+
 controllers:
   - name: kcp-users-controller
     repoURL: "ghcr.io/cogniteo/helm-charts"

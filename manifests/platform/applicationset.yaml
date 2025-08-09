@@ -19,6 +19,11 @@ spec:
               clusterName: ${CLUSTER_NAME}
               externalHostname: ${KCP_HOSTNAME}
               cognitoUserPoolId: ${COGNITO_USER_POOL_ID}
+              oidc:
+                enabled: true
+                clientId: ${COGNITO_CLIENT_ID}
+                issuerUrl: ${ISSUER_URL}
+                usernameClaim: "email"
           - name: certificates
             path: manifests/platform/certificates
             helm: true

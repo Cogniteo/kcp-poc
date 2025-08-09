@@ -58,7 +58,7 @@ KUBECTL_KCP := kubectl --kubeconfig="$(KUBECONFIG_FILE)"
         vpc-create vpc-delete \
         eks-create eks-delete \
         cognito-create cognito-delete \
-        kcp-setup-kubectl kcp-create-kubeconfig \
+        kcp-setup-kubectl kcp-create-kubeconfig kcp-setup-oidc kcp-setup-oidc-root \
         controllers-create-tls-secret controllers-deploy \
         kcp-example-export-users-api kcp-example-create-users kcp-example-clean-up ecr-clean apply-admin-user
 
@@ -93,6 +93,8 @@ help:
 	@echo "KCP Setup:"
 	@echo "  make kcp-setup-kubectl     - Install kubectl plugins for KCP"
 	@echo "  make kcp-create-kubeconfig - Generate KCP kubeconfig"
+	@echo "  make kcp-setup-oidc        - Install kubelogin and configure kubeconfig OIDC exec for KCP"
+	@echo "  make kcp-setup-oidc-root   - Create Cognito user root@$(DOMAIN) with verified email and print password"
 	@echo ""
 	@echo "KCP Examples:"
 	@echo "  make kcp-example-export-users-api - Export users API schema and APIExport"
@@ -215,27 +217,18 @@ kcp-install:
 	$(call echo_up,Installing KCP)
 	@USER_POOL_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
 	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text) && \
+	CLIENT_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text) && \
+	ISSUER_URL=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='IssuerUrl'].OutputValue" --output text) && \
 	ACME_EMAIL=$(ACME_EMAIL) \
 	KCP_HOSTNAME=$(KCP_HOSTNAME) \
 	CLUSTER_NAME=$(EKS_CLUSTER_NAME) \
+	AWS_REGION=$(AWS_REGION) \
 	COGNITO_USER_POOL_ID=$$USER_POOL_ID \
+	COGNITO_CLIENT_ID=$$CLIENT_ID \
+	ISSUER_URL=$$ISSUER_URL \
 	envsubst < manifests/platform/applicationset.yaml | $(KUBECTL_EKS) apply -f -
-	
-	$(call echo_up,Creating OIDC secret for Cognito integration)
-	@USER_POOL_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
-	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text) && \
-	CLIENT_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
-	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text) && \
-	CLIENT_SECRET=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
-	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientSecret'].OutputValue" --output text) && \
-	OIDC_URL="https://cognito-idp.$(AWS_REGION).amazonaws.com/$$USER_POOL_ID" && \
-	$(KUBECTL_EKS) create namespace kcp --dry-run=client -o yaml | $(KUBECTL_EKS) apply -f - && \
-	$(KUBECTL_EKS) create secret generic oidc-secret \
-	  --namespace=kcp \
-	  --from-literal=url=$$OIDC_URL \
-	  --from-literal=client_id=$$CLIENT_ID \
-	  --from-literal=client_secret=$$CLIENT_SECRET \
-	  --dry-run=client -o yaml | $(KUBECTL_EKS) apply -f -
 	$(call echo_up,Waiting for application to be created)
 	@echo "Waiting for kcp-suite application to be created..."; \
 	until $(KUBECTL_EKS) -n argocd get application kcp-suite >/dev/null 2>&1; do \
@@ -285,6 +278,54 @@ kcp-create-kubeconfig:
 	$(KUBECTL_KCP) config set-context kcp-base --cluster=base --user=kcp-admin
 	$(KUBECTL_KCP) config set-context kcp-root --cluster=root --user=kcp-admin
 	$(KUBECTL_KCP) config use-context kcp-root
+
+# OIDC auth via kubelogin (oidc-login krew plugin)
+kcp-setup-oidc:
+	$(call echo_up,Installing kubelogin (oidc-login) plugin via krew)
+	@kubectl krew install oidc-login || true
+	$(call echo_up,Configuring kubeconfig user with kubelogin exec)
+	@USER_POOL_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text) && \
+	CLIENT_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text) && \
+	ISSUER_URL=https://cognito-idp.$(AWS_REGION).amazonaws.com/$$USER_POOL_ID && \
+	$(KUBECTL_KCP) config set-credentials kcp-oidc \
+	  --exec-api-version=client.authentication.k8s.io/v1 \
+	  --exec-command=kubectl \
+	  --exec-arg=oidc-login \
+	  --exec-arg=get-token \
+	  --exec-arg=--oidc-issuer-url=$$ISSUER_URL \
+	  --exec-arg=--oidc-client-id=$$CLIENT_ID \
+	  --exec-arg=--oidc-redirect-url=http://localhost:8000 \
+	  --exec-arg=--listen-address=127.0.0.1:8000
+	$(call echo_up,Creating context kcp-root-oidc)
+	@$(KUBECTL_KCP) config set-context kcp-root-oidc --cluster=root --user=kcp-oidc
+
+# Create sample root user in Cognito User Pool
+kcp-setup-oidc-root:
+	$(call echo_up,Creating root user in Cognito User Pool)
+	@USER_POOL_ID=$$(aws cloudformation describe-stacks --stack-name $(EKS_CLUSTER_NAME)-cognito --region $(AWS_REGION) \
+	  --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text) && \
+	EMAIL="root@$(DOMAIN)" && \
+	PASSWORD=$$( (head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20; echo 'Aa1!') | tr -d '\n' ) && \
+	echo "Using user pool: $$USER_POOL_ID" && \
+	echo "Creating/Updating user $$EMAIL ..." && \
+	aws cognito-idp admin-create-user \
+	  --region $(AWS_REGION) \
+	  --user-pool-id $$USER_POOL_ID \
+	  --username "$$EMAIL" \
+	  --message-action SUPPRESS \
+	  --user-attributes Name=email,Value="$$EMAIL" Name=name,Value=Root Name=email_verified,Value=true \
+	  >/dev/null 2>&1 || true && \
+	aws cognito-idp admin-set-user-password \
+	  --region $(AWS_REGION) \
+	  --user-pool-id $$USER_POOL_ID \
+	  --username "$$EMAIL" \
+	  --password "$$PASSWORD" \
+	  --permanent && \
+	echo "" && \
+	echo "Created/updated Cognito user: $$EMAIL" && \
+	echo "Temporary password (store securely): $$PASSWORD"
 
 # Controllers Management
 controllers-create-tls-secret:

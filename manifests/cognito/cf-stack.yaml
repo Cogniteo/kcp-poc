@@ -46,7 +46,7 @@ Resources:
     Properties:
       UserPoolId: !Ref KcpUserPool
       ClientName: kcp-app-client
-      GenerateSecret: true
+      GenerateSecret: false
       AllowedOAuthFlows:
         - code
       AllowedOAuthFlowsUserPoolClient: true
@@ -55,7 +55,7 @@ Resources:
         - openid
         - profile
       CallbackURLs:
-        - !Ref CallbackUrl
+        - http://localhost:8000
       ExplicitAuthFlows:
         - ALLOW_USER_SRP_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
@@ -88,9 +88,9 @@ Outputs:
     Value: !Ref KcpUserPoolClient
     Export:
       Name: !Sub '${ClusterName}-UserPoolClientId'
-  UserPoolClientSecret:
-    Description: Client secret of the Cognito User Pool Client
-    Value: !GetAtt KcpUserPoolClient.ClientSecret
+  IssuerUrl:
+    Description: OIDC issuer URL for the Cognito User Pool
+    Value: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${KcpUserPool}'
     Export:
-      Name: !Sub '${ClusterName}-UserPoolClientSecret'
+      Name: !Sub '${ClusterName}-IssuerUrl'
 
