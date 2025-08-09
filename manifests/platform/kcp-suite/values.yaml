@@ -15,7 +15,11 @@ kcp:
       annotations:
         nginx.ingress.kubernetes.io/ssl-passthrough: "true"
   etcd:
-    memory: "256Mi"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "256m"
+      limits: {}
   volumeClassName: "standard"
   audit:
     enabled: false
