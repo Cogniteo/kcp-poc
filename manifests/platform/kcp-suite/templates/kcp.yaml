@@ -13,28 +13,7 @@ spec:
     helm:
       releaseName: kcp
       valuesObject:
-        externalHostname: {{ .Values.kcp.externalHostname | quote }}
-        kcpFrontProxy:
-          v: {{ .Values.kcp.kcpFrontProxy.v }}
-          service:
-            type: {{ .Values.kcp.kcpFrontProxy.service.type | quote }}
-          ingress:
-            enabled: {{ .Values.kcp.ingress.enabled }}
-            ingressClassName: {{ .Values.kcp.ingress.ingressClassName | quote }}
-            annotations:
-              nginx.ingress.kubernetes.io/ssl-passthrough: {{ index .Values.kcp.ingress.annotations "nginx.ingress.kubernetes.io/ssl-passthrough" | quote }}
-        certificateIssuer:
-          name: {{ .Values.kcp.certificateIssuerName | quote }}
-          kind: {{ .Values.kcp.certificateIssuerKind | quote }}
-        etcd:
-          resources:
-            requests:
-              memory: {{ .Values.kcp.etcd.memory | quote }}
-        kcp:
-          v: {{ .Values.kcp.v }}
-          volumeClassName: {{ .Values.kcp.volumeClassName | quote }}
-        audit:
-          enabled: {{ .Values.kcp.auditEnabled }}
+        {{- include "common.tplvalues.render" (dict "value" .Values.kcp "context" $) | nindent 8 }}
   destination:
     server: https://kubernetes.default.svc
     namespace: kcp
